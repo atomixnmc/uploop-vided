@@ -207,5 +207,4 @@ export default Slideshow;
 
 // Auto-mount
 const el = document.querySelector(".stage") || document.body;
-el.innerHTML = "";
 Slideshow.mount(el);

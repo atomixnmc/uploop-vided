@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Minimal Repro — uploop-vided</title>
+  <style>
+    body { background: #0a0a0f; color: #e0e0e0; font-family: system-ui; padding: 40px; }
+    #root { background: #151520; padding: 24px; border-radius: 8px; max-width: 400px; }
+    button { margin-top: 12px; padding: 8px 16px; cursor: pointer; }
+    .info { margin-top: 16px; font-size: 13px; color: #888; }
+  </style>
+</head>
+<body>
+  <div id="root">Loading...</div>
+  <div class="info" id="info"></div>
+
+  <script type="module">
+    import { html, component } from '@uploop/html'
+
+    const Counter = component('Counter', {
+      state: { count: 0 },
+      update: {
+        inc: (s) => ({ count: s.count + 1 }),
+      },
+      view: (state, { send }) => html`
+        <div>Count: <strong>${state.count}</strong></div>
+        <button @click=${() => send('inc')}>+1</button>
+      `,
+    })
+
+    const root = document.getElementById('root')
+    const info = document.getElementById('info')
+
+    Counter.mount(root)
+
+    // Debug logging
+    let clicks = 0
+    Counter.loop.subscribe(() => {
+      clicks++
+      const s = Counter.loop.get()
+      const html = root.innerHTML
+      info.textContent = `subscribe #${clicks} | count=${s.count} | innerHTML length=${html.length} | has button=${html.includes('<button') || html.includes('button')}`
+      console.log(info.textContent)
+    })
+
+    console.log('mounted. root.innerHTML:', root.innerHTML.substring(0, 100))
+  </script>
+</body>
+</html>
