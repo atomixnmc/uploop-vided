@@ -24,8 +24,60 @@
             }
             .subtitle {
                 color: #666;
-                margin-bottom: 32px;
+                margin-bottom: 28px;
                 font-size: 14px;
+            }
+
+            /* ── Tabs ──────────────────────────────────── */
+            .tab-bar {
+                display: flex;
+                gap: 0;
+                margin-bottom: 20px;
+                border-bottom: 1px solid #222;
+            }
+            .tab-btn {
+                padding: 10px 24px;
+                border: none;
+                background: none;
+                color: #666;
+                font-size: 14px;
+                font-family: inherit;
+                cursor: pointer;
+                border-bottom: 2px solid transparent;
+                transition: all 0.2s;
+                display: flex;
+                align-items: center;
+                gap: 7px;
+            }
+            .tab-btn:hover {
+                color: #aaa;
+            }
+            .tab-btn.active {
+                color: #4f8;
+                border-bottom-color: #4f8;
+            }
+            .tab-btn .tab-emoji {
+                font-size: 18px;
+            }
+            .tab-btn .tab-count {
+                font-size: 11px;
+                color: #555;
+                background: #151520;
+                padding: 1px 7px;
+                border-radius: 10px;
+                margin-left: 2px;
+            }
+            .tab-btn.active .tab-count {
+                background: #1a2a1a;
+                color: #4f8;
+            }
+
+            /* ── Panels ────────────────────────────────── */
+            .tab-panel {
+                display: none;
+            }
+            .tab-panel.active {
+                display: block;
             }
             .example-list {
                 display: flex;
@@ -61,6 +113,10 @@
                 border-radius: 3px;
                 margin-top: 6px;
             }
+            .example-card .tag-edu {
+                background: #3a2a4a;
+                color: #a78bfa;
+            }
         </style>
     </head>
     <body>
@@ -68,272 +124,308 @@
         <p class="subtitle">
             Generative AI-driven composition &amp; VFX engine
         </p>
-        <h2
-            style="
-                font-size: 1.2rem;
-                color: #888;
-                margin-bottom: 12px;
-                text-transform: uppercase;
-                letter-spacing: 0.05em;
-            "
-        >
-            Basic Examples
-        </h2>
-        <div class="example-list">
-            <a
-                href="editor/"
-                class="example-card"
-                style="border: 1px solid #2a5a2a"
-            >
-                <h3>🎬 Editor Workspace</h3>
-                <p>
-                    Full video editor — timeline, preview, inspector, library,
-                    playback controls
-                </p>
-                <span class="tag" style="background: #2a5a2a; color: #4f8"
-                    >editor</span
+
+        <!-- ── Tab Bar ──────────────────────────────── -->
+        <div class="tab-bar">
+            <button class="tab-btn active" data-tab="basic">
+                <span class="tab-emoji">⚙️</span>
+                <span>Basic Examples</span>
+                <span class="tab-count">20</span>
+            </button>
+            <button class="tab-btn" data-tab="advanced">
+                <span class="tab-emoji">🧠</span>
+                <span>Advanced Examples</span>
+                <span class="tab-count">10</span>
+            </button>
+        </div>
+
+        <!-- ── Basic Panel ──────────────────────────── -->
+        <div class="tab-panel active" id="panel-basic">
+            <div class="example-list">
+                <a
+                    href="editor/"
+                    class="example-card"
+                    style="border: 1px solid #2a5a2a"
                 >
-                <span class="tag" style="margin-left: 4px">ui</span>
-            </a>
-            <a href="01-slideshow/" class="example-card">
-                <h3>01 · Slideshow</h3>
-                <p>
-                    Image slideshow with easing transitions using
-                    @uploop/timeline
-                </p>
-                <span class="tag">timeline</span>
-            </a>
-            <a href="02-multitrack-timeline/" class="example-card">
-                <h3>02 · Multitrack Timeline</h3>
-                <p>
-                    Multi-track timeline with video, text, and audio layers
-                    using Timeline, Track, Clip
-                </p>
-                <span class="tag">timeline</span>
-            </a>
-            <a href="03-video-transitions/" class="example-card">
-                <h3>03 · Video Transitions</h3>
-                <p>
-                    Video playlist with fade, slide, and zoom transitions using
-                    createTransition
-                </p>
-                <span class="tag">compositor</span>
-            </a>
-            <a href="04-audio-mixer/" class="example-card">
-                <h3>04 · Audio Mixer</h3>
-                <p>
-                    Multi-track audio mixer with volume, mute, and solo controls
-                    per track
-                </p>
-                <span class="tag">timeline</span>
-            </a>
-            <a href="05-keyframe-animation/" class="example-card">
-                <h3>05 · Keyframe Animation</h3>
-                <p>
-                    Keyframe interpolation for x, y, opacity, scale with
-                    draggable keyframe editor
-                </p>
-                <span class="tag">timeline</span>
-            </a>
-            <a href="06-layer-compositor/" class="example-card">
-                <h3>06 · Layer Compositor</h3>
-                <p>
-                    Multi-layer compositing with visibility toggles, opacity
-                    sliders, and layer reordering
-                </p>
-                <span class="tag">compositor</span>
-            </a>
-            <a href="07-blend-modes/" class="example-card">
-                <h3>07 · Blend Modes</h3>
-                <p>All 8 canvas blend modes with overlapping colored circles</p>
-                <span class="tag">compositor</span>
-            </a>
-            <a href="08-text-overlay/" class="example-card">
-                <h3>08 · Text Overlay</h3>
-                <p>Animated text overlay on video using keyframe timing</p>
-                <span class="tag">timeline</span>
-            </a>
-            <a href="09-picture-in-picture/" class="example-card">
-                <h3>09 · Picture-in-Picture</h3>
-                <p>
-                    Draggable PiP overlay with size toggle and opacity control
-                </p>
-                <span class="tag">compositor</span>
-            </a>
-            <a href="10-image-gallery/" class="example-card">
-                <h3>10 · Image Gallery</h3>
-                <p>8-slide gallery with fade transitions and auto-play</p>
-                <span class="tag">compositor</span>
-            </a>
-            <a href="11-video-wall/" class="example-card">
-                <h3>11 · Video Wall</h3>
-                <p>
-                    2×2 grid of simultaneous video playback with canvas
-                    placeholder
-                </p>
-                <span class="tag">media</span>
-            </a>
-            <a href="12-fade-transitions/" class="example-card">
-                <h3>12 · Fade Transitions</h3>
-                <p>Fade and dissolve transitions between two colored panels</p>
-                <span class="tag">compositor</span>
-            </a>
-            <a href="13-wipe-transitions/" class="example-card">
-                <h3>13 · Wipe Transitions</h3>
-                <p>All 4 wipe directions with direction indicator</p>
-                <span class="tag">compositor</span>
-            </a>
-            <a href="14-slide-transitions/" class="example-card">
-                <h3>14 · Slide Transitions</h3>
-                <p>
-                    Slide transition showcase — left, right, up, down with two
-                    colored panels
-                </p>
-                <span class="tag">compositor</span>
-            </a>
-            <a href="15-zoom-transitions/" class="example-card">
-                <h3>15 · Zoom Transitions</h3>
-                <p>Zoom in/out transitions with live zoom percentage display</p>
-                <span class="tag">compositor</span>
-            </a>
-            <a href="16-crossfade-audio/" class="example-card">
-                <h3>16 · Crossfade Audio</h3>
-                <p>
-                    Audio crossfading between two tracks with volume meters and
-                    fader
-                </p>
-                <span class="tag">timeline</span>
-            </a>
-            <a href="17-playlist-player/" class="example-card">
-                <h3>17 · Playlist Player</h3>
-                <p>
-                    Video playlist with fade transitions, queue display, and
-                    auto-advance
-                </p>
-                <span class="tag">compositor</span>
-                <span class="tag" style="margin-left: 4px">timeline</span>
-            </a>
-            <a href="18-color-effects/" class="example-card">
-                <h3>18 · Color Effects</h3>
-                <p>
-                    Color effect presets — sepia, grayscale, invert, vintage,
-                    cool, warm with intensity slider
-                </p>
-                <span class="tag">compositor</span>
-            </a>
-            <a href="19-split-screen/" class="example-card">
-                <h3>19 · Split Screen</h3>
-                <p>
-                    Two videos side by side with draggable divider and
-                    orientation toggle
-                </p>
-                <span class="tag">compositor</span>
-            </a>
-            <a href="20-final-composite/" class="example-card">
-                <h3>20 · Final Composite</h3>
-                <p>
-                    Full pipeline: Timeline → Compositor → Preview with
-                    multi-track timeline and scrubber
-                </p>
-                <span class="tag">timeline</span>
-                <span class="tag" style="margin-left: 4px">compositor</span>
-            </a>
+                    <h3>🎬 Editor Workspace</h3>
+                    <p>
+                        Full video editor — timeline, preview, inspector,
+                        library, playback controls
+                    </p>
+                    <span class="tag" style="background: #2a5a2a; color: #4f8"
+                        >editor</span
+                    >
+                    <span class="tag" style="margin-left: 4px">ui</span>
+                </a>
+                <a href="01-slideshow/" class="example-card">
+                    <h3>01 · Slideshow</h3>
+                    <p>
+                        Image slideshow with easing transitions using
+                        @uploop/timeline
+                    </p>
+                    <span class="tag">timeline</span>
+                </a>
+                <a href="02-multitrack-timeline/" class="example-card">
+                    <h3>02 · Multitrack Timeline</h3>
+                    <p>
+                        Multi-track timeline with video, text, and audio layers
+                        using Timeline, Track, Clip
+                    </p>
+                    <span class="tag">timeline</span>
+                </a>
+                <a href="03-video-transitions/" class="example-card">
+                    <h3>03 · Video Transitions</h3>
+                    <p>
+                        Video playlist with fade, slide, and zoom transitions
+                        using createTransition
+                    </p>
+                    <span class="tag">compositor</span>
+                </a>
+                <a href="04-audio-mixer/" class="example-card">
+                    <h3>04 · Audio Mixer</h3>
+                    <p>
+                        Multi-track audio mixer with volume, mute, and solo
+                        controls per track
+                    </p>
+                    <span class="tag">timeline</span>
+                </a>
+                <a href="05-keyframe-animation/" class="example-card">
+                    <h3>05 · Keyframe Animation</h3>
+                    <p>
+                        Keyframe interpolation for x, y, opacity, scale with
+                        draggable keyframe editor
+                    </p>
+                    <span class="tag">timeline</span>
+                </a>
+                <a href="06-layer-compositor/" class="example-card">
+                    <h3>06 · Layer Compositor</h3>
+                    <p>
+                        Multi-layer compositing with visibility toggles, opacity
+                        sliders, and layer reordering
+                    </p>
+                    <span class="tag">compositor</span>
+                </a>
+                <a href="07-blend-modes/" class="example-card">
+                    <h3>07 · Blend Modes</h3>
+                    <p>
+                        All 8 canvas blend modes with overlapping colored
+                        circles
+                    </p>
+                    <span class="tag">compositor</span>
+                </a>
+                <a href="08-text-overlay/" class="example-card">
+                    <h3>08 · Text Overlay</h3>
+                    <p>Animated text overlay on video using keyframe timing</p>
+                    <span class="tag">timeline</span>
+                </a>
+                <a href="09-picture-in-picture/" class="example-card">
+                    <h3>09 · Picture-in-Picture</h3>
+                    <p>
+                        Draggable PiP overlay with size toggle and opacity
+                        control
+                    </p>
+                    <span class="tag">compositor</span>
+                </a>
+                <a href="10-image-gallery/" class="example-card">
+                    <h3>10 · Image Gallery</h3>
+                    <p>8-slide gallery with fade transitions and auto-play</p>
+                    <span class="tag">compositor</span>
+                </a>
+                <a href="11-video-wall/" class="example-card">
+                    <h3>11 · Video Wall</h3>
+                    <p>
+                        2×2 grid of simultaneous video playback with canvas
+                        placeholder
+                    </p>
+                    <span class="tag">media</span>
+                </a>
+                <a href="12-fade-transitions/" class="example-card">
+                    <h3>12 · Fade Transitions</h3>
+                    <p>
+                        Fade and dissolve transitions between two colored panels
+                    </p>
+                    <span class="tag">compositor</span>
+                </a>
+                <a href="13-wipe-transitions/" class="example-card">
+                    <h3>13 · Wipe Transitions</h3>
+                    <p>All 4 wipe directions with direction indicator</p>
+                    <span class="tag">compositor</span>
+                </a>
+                <a href="14-slide-transitions/" class="example-card">
+                    <h3>14 · Slide Transitions</h3>
+                    <p>Slide transition showcase — left, right, up, down</p>
+                    <span class="tag">compositor</span>
+                </a>
+                <a href="15-zoom-transitions/" class="example-card">
+                    <h3>15 · Zoom Transitions</h3>
+                    <p>
+                        Zoom in/out transitions with live zoom percentage
+                        display
+                    </p>
+                    <span class="tag">compositor</span>
+                </a>
+                <a href="16-crossfade-audio/" class="example-card">
+                    <h3>16 · Crossfade Audio</h3>
+                    <p>
+                        Audio crossfading between two tracks with volume meters
+                        and fader
+                    </p>
+                    <span class="tag">timeline</span>
+                </a>
+                <a href="17-playlist-player/" class="example-card">
+                    <h3>17 · Playlist Player</h3>
+                    <p>
+                        Video playlist with fade transitions, queue display, and
+                        auto-advance
+                    </p>
+                    <span class="tag">compositor</span>
+                    <span class="tag" style="margin-left: 4px">timeline</span>
+                </a>
+                <a href="18-color-effects/" class="example-card">
+                    <h3>18 · Color Effects</h3>
+                    <p>
+                        Color effect presets — sepia, grayscale, invert,
+                        vintage, cool, warm with intensity slider
+                    </p>
+                    <span class="tag">compositor</span>
+                </a>
+                <a href="19-split-screen/" class="example-card">
+                    <h3>19 · Split Screen</h3>
+                    <p>
+                        Two videos side by side with draggable divider and
+                        orientation toggle
+                    </p>
+                    <span class="tag">compositor</span>
+                </a>
+                <a href="20-final-composite/" class="example-card">
+                    <h3>20 · Final Composite</h3>
+                    <p>
+                        Full pipeline: Timeline → Compositor → Preview with
+                        multi-track timeline and scrubber
+                    </p>
+                    <span class="tag">timeline</span>
+                    <span class="tag" style="margin-left: 4px">compositor</span>
+                </a>
+            </div>
         </div>
-        <h2 style="margin-top: 40px; font-size: 1.4rem">Advanced Examples</h2>
-        <p class="subtitle" style="margin-bottom: 16px">
-            Interactive educational visualizations
-        </p>
-        <div class="example-list">
-            <a href="advanced/21-calculus-visualization/" class="example-card">
-                <h3>21 · Calculus Visualization</h3>
-                <p>
-                    Derivatives, integrals, and limits — tangent lines, Riemann
-                    sums, animated approach
-                </p>
-                <span class="tag">timeline</span>
-                <span class="tag" style="margin-left: 4px">canvas</span>
-            </a>
-            <a href="advanced/22-geometry-proofs/" class="example-card">
-                <h3>22 · Geometry Proofs</h3>
-                <p>
-                    Pythagorean theorem, circle theorems, and transformations
-                    with interactive visuals
-                </p>
-                <span class="tag">timeline</span>
-                <span class="tag" style="margin-left: 4px">canvas</span>
-            </a>
-            <a href="advanced/23-linear-algebra/" class="example-card">
-                <h3>23 · Linear Algebra</h3>
-                <p>
-                    Vectors, matrix transformations, span, and eigenvectors on a
-                    2D coordinate grid
-                </p>
-                <span class="tag">timeline</span>
-                <span class="tag" style="margin-left: 4px">canvas</span>
-            </a>
-            <a href="advanced/24-particle-simulation/" class="example-card">
-                <h3>24 · Particle Simulation</h3>
-                <p>
-                    Gravity simulation with 50-100 particles, trails, wall
-                    collisions, velocity coloring
-                </p>
-                <span class="tag">timeline</span>
-                <span class="tag" style="margin-left: 4px">canvas</span>
-            </a>
-            <a href="advanced/25-wave-propagation/" class="example-card">
-                <h3>25 · Wave Propagation</h3>
-                <p>
-                    Sine waves, interference patterns, and standing waves with
-                    adjustable parameters
-                </p>
-                <span class="tag">timeline</span>
-                <span class="tag" style="margin-left: 4px">canvas</span>
-            </a>
-            <a href="advanced/26-orbital-mechanics/" class="example-card">
-                <h3>26 · Orbital Mechanics</h3>
-                <p>
-                    Kepler's laws visualization — elliptical orbits, equal area,
-                    trajectory trails, velocity vectors
-                </p>
-                <span class="tag">timeline</span>
-                <span class="tag" style="margin-left: 4px">canvas</span>
-            </a>
-            <a href="advanced/27-music-synthesizer/" class="example-card">
-                <h3>27 · Music Synthesizer</h3>
-                <p>
-                    Web Audio API synthesizer — oscillator types, piano
-                    keyboard, FFT spectrum, ADSR envelope
-                </p>
-                <span class="tag">timeline</span>
-                <span class="tag" style="margin-left: 4px">audio</span>
-            </a>
-            <a href="advanced/28-frequency-spectrum/" class="example-card">
-                <h3>28 · Frequency Spectrum</h3>
-                <p>
-                    Real-time FFT visualizer — bars, circle, waterfall modes,
-                    peak detection and note identification
-                </p>
-                <span class="tag">timeline</span>
-                <span class="tag" style="margin-left: 4px">audio</span>
-            </a>
-            <a href="advanced/29-chemistry-molecules/" class="example-card">
-                <h3>29 · Chemistry Molecules</h3>
-                <p>
-                    Ball-and-stick 3D molecule viewer — H₂O, CO₂, NaCl with
-                    rotation, bond angles, atom labels
-                </p>
-                <span class="tag">timeline</span>
-                <span class="tag" style="margin-left: 4px">canvas</span>
-            </a>
-            <a href="advanced/30-history-timeline/" class="example-card">
-                <h3>30 · History Timeline</h3>
-                <p>
-                    Interactive scientific discoveries timeline — 15 events from
-                    240 BCE to 1953 CE with zoom and filters
-                </p>
-                <span class="tag">timeline</span>
-                <span class="tag" style="margin-left: 4px">compositor</span>
-            </a>
+
+        <!-- ── Advanced Panel ───────────────────────── -->
+        <div class="tab-panel" id="panel-advanced">
+            <div class="example-list">
+                <a
+                    href="advanced/21-calculus-visualization/"
+                    class="example-card"
+                >
+                    <h3>📐 21 · Calculus Visualization</h3>
+                    <p>
+                        Derivatives, integrals, and limits — tangent lines,
+                        Riemann sums, animated approach
+                    </p>
+                    <span class="tag tag-edu">math</span>
+                    <span class="tag" style="margin-left: 4px">canvas</span>
+                </a>
+                <a href="advanced/22-geometry-proofs/" class="example-card">
+                    <h3>📏 22 · Geometry Proofs</h3>
+                    <p>
+                        Pythagorean theorem, circle theorems, and
+                        transformations with interactive visuals
+                    </p>
+                    <span class="tag tag-edu">math</span>
+                    <span class="tag" style="margin-left: 4px">canvas</span>
+                </a>
+                <a href="advanced/23-linear-algebra/" class="example-card">
+                    <h3>📊 23 · Linear Algebra</h3>
+                    <p>
+                        Vectors, matrix transformations, span, and eigenvectors
+                        on a 2D coordinate grid
+                    </p>
+                    <span class="tag tag-edu">math</span>
+                    <span class="tag" style="margin-left: 4px">canvas</span>
+                </a>
+                <a href="advanced/24-particle-simulation/" class="example-card">
+                    <h3>⚛️ 24 · Particle Simulation</h3>
+                    <p>
+                        Gravity simulation with 50-100 particles, trails, wall
+                        collisions, velocity coloring
+                    </p>
+                    <span class="tag tag-edu">physics</span>
+                    <span class="tag" style="margin-left: 4px">canvas</span>
+                </a>
+                <a href="advanced/25-wave-propagation/" class="example-card">
+                    <h3>🌊 25 · Wave Propagation</h3>
+                    <p>
+                        Sine waves, interference patterns, and standing waves
+                        with adjustable parameters
+                    </p>
+                    <span class="tag tag-edu">physics</span>
+                    <span class="tag" style="margin-left: 4px">canvas</span>
+                </a>
+                <a href="advanced/26-orbital-mechanics/" class="example-card">
+                    <h3>🪐 26 · Orbital Mechanics</h3>
+                    <p>
+                        Kepler's laws visualization — elliptical orbits, equal
+                        area, trajectory trails, velocity vectors
+                    </p>
+                    <span class="tag tag-edu">physics</span>
+                    <span class="tag" style="margin-left: 4px">canvas</span>
+                </a>
+                <a href="advanced/27-music-synthesizer/" class="example-card">
+                    <h3>🎹 27 · Music Synthesizer</h3>
+                    <p>
+                        Web Audio API synthesizer — oscillator types, piano
+                        keyboard, FFT spectrum, ADSR envelope
+                    </p>
+                    <span class="tag tag-edu">music</span>
+                    <span class="tag" style="margin-left: 4px">audio</span>
+                </a>
+                <a href="advanced/28-frequency-spectrum/" class="example-card">
+                    <h3>🎛️ 28 · Frequency Spectrum</h3>
+                    <p>
+                        Real-time FFT visualizer — bars, circle, waterfall
+                        modes, peak detection and note identification
+                    </p>
+                    <span class="tag tag-edu">music</span>
+                    <span class="tag" style="margin-left: 4px">audio</span>
+                </a>
+                <a href="advanced/29-chemistry-molecules/" class="example-card">
+                    <h3>⚗️ 29 · Chemistry Molecules</h3>
+                    <p>
+                        Ball-and-stick 3D molecule viewer — H₂O, CO₂, NaCl with
+                        rotation, bond angles, atom labels
+                    </p>
+                    <span class="tag tag-edu">chemistry</span>
+                    <span class="tag" style="margin-left: 4px">canvas</span>
+                </a>
+                <a href="advanced/30-history-timeline/" class="example-card">
+                    <h3>📜 30 · History Timeline</h3>
+                    <p>
+                        Interactive scientific discoveries timeline — 15 events
+                        from 240 BCE to 1953 CE with zoom and filters
+                    </p>
+                    <span class="tag tag-edu">history</span>
+                    <span class="tag" style="margin-left: 4px">compositor</span>
+                </a>
+            </div>
         </div>
+
+        <!-- ── Tab Script ──────────────────────────── -->
+        <script>
+            const btns = document.querySelectorAll(".tab-btn");
+            const panels = document.querySelectorAll(".tab-panel");
+
+            btns.forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    const target = btn.dataset.tab;
+                    btns.forEach((b) => b.classList.remove("active"));
+                    btn.classList.add("active");
+                    panels.forEach((p) => {
+                        p.classList.toggle(
+                            "active",
+                            p.id === "panel-" + target,
+                        );
+                    });
+                });
+            });
+        </script>
     </body>
 </html>
