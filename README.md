@@ -99,6 +99,8 @@ pnpm dev
 
 Open `http://localhost:3002` — you'll see the examples gallery.
 
+🌐 **Live demo:** [atomixnmc.github.io/uploop-vided](https://atomixnmc.github.io/uploop-vided/)
+
 - **31 interactive examples** (20 basic + 10 advanced education + 1 editor)
 - **Editor workspace** at `/editor/` — full video editor with timeline, preview, inspector
 
