@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Trails — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f; color: #e0e0e0; font-family: system-ui, sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      padding: 60px 24px 40px; gap: 14px;
+    }
+    .back { position: fixed; top: 16px; left: 16px; color: #888; text-decoration: none; font-size: 14px; z-index: 100; }
+    .back:hover { color: #fff; }
+    .title-bar { width: min(960px, 90vw); display: flex; align-items: center; justify-content: space-between; }
+    .title-bar h1 { font-size: 1.25rem; font-weight: 600; color: #4f8; }
+    .title-bar span { font-size: 12px; color: #666; }
+    canvas {
+      width: min(960px, 90vw); height: 480px;
+      background: #151520; border-radius: 12px; border: 1px solid #252535; display: block;
+    }
+    .controls {
+      width: min(960px, 90vw); background: #151520; border-radius: 10px;
+      padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    }
+    .control-group { display: flex; flex-direction: column; gap: 3px; }
+    .control-group label { font-size: 11px; color: #888; }
+    .control-group .val { font-size: 11px; color: #4f8; font-family: 'Courier New', monospace; }
+    .control-group input[type="range"] { accent-color: #4f8; width: 100px; }
+    button {
+      background: #1e1e30; color: #e0e0e0; border: 1px solid #333;
+      padding: 8px 16px; border-radius: 8px; cursor: pointer;
+      font-size: 13px; transition: all 0.2s; white-space: nowrap;
+    }
+    button:hover { background: #2a2a40; }
+    button.playing { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    button.mode-active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .mode-btns { display: flex; gap: 4px; }
+    .mode-btns button { padding: 6px 12px; font-size: 11px; }
+    .info-box {
+      width: min(960px, 90vw); background: #0f0f1a; border: 1px solid #252535;
+      border-radius: 8px; padding: 10px 18px; font-size: 12px; color: #aaa;
+      display: flex; gap: 24px; flex-wrap: wrap;
+    }
+    .info-box span { color: #f8c040; font-family: 'Courier New', monospace; }
+    .info-box code { color: #4f8; }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+  <div id="root"></div>
+
+  <script type="module">
+    import { html, component } from '@uploop/html'
+    import { easing } from '@uploop/timeline'
+    import { blendModes } from '@uploop/compositor'
+
+    const BBB_VIDEO = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4'
+
+    const VideoTrails = component('VideoTrails', {
+      state: {
+        playing: false, trailLength: 8, decay: 0.7,
+        blendMode: 'screen', fps: 0,
+      },
+      update: {
+        togglePlay: (s) => ({ ...s, playing: !s.playing }),
+        setPlaying: (s, p) => ({ ...s, playing: p }),
+        setTrailLength: (s, v) => ({ ...s, trailLength: v }),
+        setDecay: (s, v) => ({ ...s, decay: v }),
+        setBlendMode: (s, v) => ({ ...s, blendMode: v }),
+        setFps: (s, v) => ({ ...s, fps: v }),
+      },
+      view: (state, { send }) => html`
+        <div class="title-bar">
+          <h1>👣 Video Trails — Motion Echo Effect</h1>
+          <span>Frame Buffer · Blend Modes · Decay</span>
+        </div>
+        <canvas id="viz"></canvas>
+        <div class="controls">
+          <button id="playBtn" class="${state.playing ? 'playing' : ''}" onclick=${() => send('togglePlay')}>
+            ${state.playing ? '⏸ Pause' : '▶ Play'}
+          </button>
+          <button onclick=${() => send('clearTrails')}>🗑 Clear</button>
+          <div class="control-group">
+            <label>Trails <span class="val">${state.trailLength}</span></label>
+            <input type="range" min="1" max="30" step="1" value="${state.trailLength}"
+              oninput=${(e) => send('setTrailLength', Number(e.target.value))} />
+          </div>
+          <div class="control-group">
+            <label>Decay <span class="val">${(state.decay * 100).toFixed(0)}%</span></label>
+            <input type="range" min="0.1" max="0.99" step="0.01" value="${state.decay}"
+              oninput=${(e) => send('setDecay', Number(e.target.value))} />
+          </div>
+          <div class="mode-btns">
+            ${[{ k: 'screen', n: 'Screen' }, { k: 'lighter', n: 'Add' }, { k: 'source-over', n: 'Normal' }].map(bm => html`
+              <button class="${state.blendMode === bm.k ? 'mode-active' : ''}" onclick=${() => send('setBlendMode', bm.k)}>${bm.n}</button>
+            `)}
+          </div>
+        </div>
+        <div class="info-box">
+          <div>FPS: <span id="fpsVal">0</span></div>
+          <div>Buffer: <span id="bufInfo">0 frames</span></div>
+          <div>Using <code>@uploop/timeline</code> · <code>@uploop/compositor</code> blendModes</div>
+        </div>
+      `,
+      mount(el, ctx) {
+        const canvas = el.querySelector('#viz')
+        const c = canvas.getContext('2d')
+        let video, W, H, frameBuffer = []
+        let fpsCounter = 0, fpsTime = 0
+
+        function resize() {
+          const rect = canvas.getBoundingClientRect()
+          canvas.width = W = rect.width * devicePixelRatio
+          canvas.height = H = rect.height * devicePixelRatio
+        }
+
+        function loadVideo() {
+          video = document.createElement('video')
+          video.crossOrigin = 'anonymous'; video.src = BBB_VIDEO
+          video.loop = true; video.muted = true; video.playsInline = true
+          video.addEventListener('loadedmetadata', () => {
+            resize()
+            video.play(); ctx.send('setPlaying', true); loop()
+          })
+        }
+
+        function captureFrame() {
+          const offCanvas = document.createElement('canvas')
+          offCanvas.width = W; offCanvas.height = H
+          const offCtx = offCanvas.getContext('2d')
+          offCtx.drawImage(video, 0, 0, W, H)
+          return offCtx.getImageData(0, 0, W, H)
+        }
+
+        function render() {
+          if (!video || video.readyState < 2) return
+          const s = ctx.get()
+
+          // Capture current frame
+          const currentFrame = captureFrame()
+
+          // Add to buffer
+          frameBuffer.unshift(currentFrame)
+          while (frameBuffer.length > s.trailLength) {
+            frameBuffer.pop()
+          }
+
+          // Clear canvas
+          c.clearRect(0, 0, W, H)
+          c.globalCompositeOperation = 'source-over'
+
+          // Draw base frame
+          c.putImageData(currentFrame, 0, 0)
+
+          // Draw trail frames with blend mode
+          c.globalCompositeOperation = s.blendMode
+          for (let i = 1; i < frameBuffer.length; i++) {
+            const alpha = Math.pow(s.decay, i)
+            c.globalAlpha = alpha
+            c.putImageData(frameBuffer[i], 0, 0)
+          }
+          c.globalAlpha = 1
+          c.globalCompositeOperation = 'source-over'
+
+          // Vignette overlay
+          const vignette = c.createRadialGradient(W / 2, H / 2, W * 0.4, W / 2, H / 2, W * 0.7)
+          vignette.addColorStop(0, 'rgba(0,0,0,0)')
+          vignette.addColorStop(1, 'rgba(0,0,0,0.4)')
+          c.fillStyle = vignette
+          c.fillRect(0, 0, W, H)
+
+          el.querySelector('#bufInfo').textContent = `${frameBuffer.length} frames`
+
+          fpsCounter++
+          const now = performance.now()
+          if (now - fpsTime >= 1000) {
+            el.querySelector('#fpsVal').textContent = Math.round(fpsCounter / ((now - fpsTime) / 1000))
+            fpsCounter = 0; fpsTime = now
+          }
+        }
+
+        function loop() {
+          render()
+          loop._raf = requestAnimationFrame(loop)
+        }
+
+        const origSend = ctx.send
+        ctx.send = function(action, payload) {
+          if (action === 'togglePlay') {
+            if (video) { video.paused ? video.play() : video.pause(); origSend('setPlaying', !video.paused) }
+          }
+          if (action === 'clearTrails') {
+            frameBuffer = []
+            el.querySelector('#bufInfo').textContent = '0 frames'
+          }
+          origSend(action, payload)
+        }
+
+        resize(); loadVideo()
+        window.addEventListener('resize', resize)
+        return () => {
+          if (loop._raf) cancelAnimationFrame(loop._raf)
+          if (video) { video.pause(); video.src = '' }
+          window.removeEventListener('resize', resize)
+        }
+      }
+    })
+
+    VideoTrails.mount(document.getElementById('root'))
+  </script>
+</body>
+</html>

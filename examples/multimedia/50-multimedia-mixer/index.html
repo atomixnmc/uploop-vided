@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multimedia Mixer — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f; color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 60px 24px 40px; gap: 12px;
+    }
+    .back {
+      position: fixed; top: 16px; left: 16px;
+      color: #888; text-decoration: none; font-size: 14px; z-index: 100;
+    }
+    .back:hover { color: #fff; }
+    h1 { font-size: 1.25rem; font-weight: 600; color: #4f8; }
+
+    .mixer-layout {
+      width: min(900px, 90vw); display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto auto;
+      gap: 10px;
+    }
+    .panel {
+      background: #151520; border: 1px solid #1a1a2e;
+      border-radius: 10px; padding: 12px; overflow: hidden;
+    }
+    .panel.video-panel { grid-column: 1; grid-row: 1; }
+    .panel.viz-panel { grid-column: 2; grid-row: 1; }
+    .panel.text-panel { grid-column: 1 / -1; grid-row: 2; }
+    video { width: 100%; display: block; border-radius: 6px; }
+    canvas { width: 100%; display: block; border-radius: 6px; background: #0a0a0f; }
+
+    .overlay-text {
+      font-weight: 700; pointer-events: none;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+    }
+
+    .controls {
+      width: min(900px, 90vw); display: flex; flex-wrap: wrap;
+      gap: 10px; align-items: center; justify-content: center;
+    }
+    .controls input, .controls select {
+      background: #151520; color: #e0e0e0; border: 1px solid #2a2a40;
+      padding: 6px 10px; border-radius: 6px; font-size: 13px; font-family: inherit;
+    }
+    .controls input[type="range"] { accent-color: #4f8; width: 80px; }
+    .controls input[type="color"] { width: 32px; height: 24px; padding: 0; border: none; }
+    .controls button {
+      background: #151520; color: #e0e0e0; border: 1px solid #2a2a40;
+      padding: 6px 14px; border-radius: 6px; font-size: 13px;
+      cursor: pointer; font-family: inherit;
+    }
+    .controls button.active { background: #4f8; color: #0a0a0f; border-color: #4f8; }
+    .controls button.master { font-size: 16px; padding: 8px 20px; font-weight: 700; }
+    .controls label { font-size: 11px; color: #888; display: flex; align-items: center; gap: 3px; }
+    .info { font-size: 12px; color: #555; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+  <h1>50 · Full Multimedia Mixer</h1>
+  <div class="mixer-layout" id="layout">
+    <div class="panel video-panel">
+      <video id="video" src="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4" muted loop playsinline></video>
+    </div>
+    <div class="panel viz-panel">
+      <canvas id="viz-canvas" width="400" height="225"></canvas>
+    </div>
+    <div class="panel text-panel" style="position:relative;min-height:80px;display:flex;align-items:center;justify-content:center;">
+      <div class="overlay-text" id="overlay-text" style="font-size:24px;">UPLOOP VIDED</div>
+    </div>
+  </div>
+  <div class="controls" id="controls"></div>
+  <div class="info">Audio visualization + video + text overlay · @uploop/timeline easing · @uploop/compositor blendModes</div>
+
+  <script type="module">
+    import { html, component } from '@uploop/html'
+    import { easing } from '@uploop/timeline'
+    import { blendModes } from '@uploop/compositor'
+
+    const AUDIO_SOURCES = {
+      'synth': 'https://samplelib.com/lib/preview/mp3/sample-3s.mp3',
+      'drum': 'https://samplelib.com/lib/preview/mp3/sample-6s.mp3',
+      'bass': 'https://samplelib.com/lib/preview/mp3/sample-9s.mp3',
+      'piano': 'https://samplelib.com/lib/preview/mp3/sample-12s.mp3',
+    }
+
+    const VIDEO_SOURCES = {
+      'BBB': 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4',
+      'Jellyfish': 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_2MB.mp4',
+      'Sintel': 'https://test-videos.co.uk/vids/sintel/mp4/h264/720/Sintel_720_10s_2MB.mp4',
+    }
+
+    const Demo = component('MultimediaMixer', {
+      state: {
+        playing: false,
+        audioSrc: 'synth',
+        videoSrc: 'BBB',
+        overlayText: 'UPLOOP VIDED',
+        overlaySize: 24,
+        overlayColor: '#ffffff',
+        overlayX: 50,
+        overlayY: 50,
+        volume: 0.7,
+        speed: 1,
+        effectMix: 0.5,
+      },
+      update: {
+        togglePlay: (s) => {
+          if (s.playing) return { ...s, playing: false }
+          return { ...s, playing: true }
+        },
+        setAudioSrc: (s, v) => ({ ...s, audioSrc: v, playing: false }),
+        setVideoSrc: (s, v) => ({ ...s, videoSrc: v }),
+        setOverlayText: (s, v) => ({ ...s, overlayText: v }),
+        setOverlaySize: (s, v) => ({ ...s, overlaySize: parseInt(v) }),
+        setOverlayColor: (s, v) => ({ ...s, overlayColor: v }),
+        setOverlayX: (s, v) => ({ ...s, overlayX: parseFloat(v) }),
+        setOverlayY: (s, v) => ({ ...s, overlayY: parseFloat(v) }),
+        setVolume: (s, v) => ({ ...s, volume: parseFloat(v) }),
+        setSpeed: (s, v) => ({ ...s, speed: parseFloat(v) }),
+        setEffectMix: (s, v) => ({ ...s, effectMix: parseFloat(v) }),
+      },
+      view: (state, { send }) => html`
+        <a href="../.." class="back">← Examples</a>
+        <h1>50 · Full Multimedia Mixer</h1>
+        <div class="mixer-layout">
+          <div class="panel video-panel">
+            <video id="video" src="${VIDEO_SOURCES[state.videoSrc]}" muted loop playsinline></video>
+          </div>
+          <div class="panel viz-panel">
+            <canvas id="viz-canvas" width="400" height="225"></canvas>
+          </div>
+          <div class="panel text-panel" style="position:relative;min-height:80px;display:flex;align-items:center;justify-content:center;">
+            <div class="overlay-text" style="
+              font-size:${state.overlaySize}px; color:${state.overlayColor};
+              position:absolute; left:${state.overlayX}%; top:${state.overlayY}%;
+              transform:translate(-50%,-50%);
+            ">${state.overlayText}</div>
+          </div>
+        </div>
+        <div class="controls">
+          <button @click=${() => send('togglePlay')} class="master ${state.playing ? 'active' : ''}">
+            ${state.playing ? '⏸ Pause All' : '▶ Play All'}
+          </button>
+          <select @change=${(e) => send('setAudioSrc', e.target.value)}>
+            ${Object.keys(AUDIO_SOURCES).map(k => html`<option value="${k}" selected=${state.audioSrc === k}>🎵 ${k}</option>`)}
+          </select>
+          <select @change=${(e) => send('setVideoSrc', e.target.value)}>
+            ${Object.keys(VIDEO_SOURCES).map(k => html`<option value="${k}" selected=${state.videoSrc === k}>📺 ${k}</option>`)}
+          </select>
+          <input type="text" value="${state.overlayText}" @input=${(e) => send('setOverlayText', e.target.value)} style="width:140px;" />
+          <label>Size <input type="range" min="12" max="48" step="2" value="${state.overlaySize}" @input=${(e) => send('setOverlaySize', e.target.value)} /></label>
+          <label>Color <input type="color" value="${state.overlayColor}" @input=${(e) => send('setOverlayColor', e.target.value)} /></label>
+          <label>Vol <input type="range" min="0" max="1" step="0.05" value="${state.volume}" @input=${(e) => send('setVolume', e.target.value)} /></label>
+          <label>Speed <input type="range" min="0.25" max="3" step="0.05" value="${state.speed}" @input=${(e) => send('setSpeed', e.target.value)} /></label>
+          <label>FX Mix <input type="range" min="0" max="1" step="0.05" value="${state.effectMix}" @input=${(e) => send('setEffectMix', e.target.value)} /></label>
+        </div>
+        <div class="info">Audio visualization + video + text overlay · @uploop/timeline easing · @uploop/compositor blendModes</div>
+      `,
+      mount(el, ctx) {
+        const video = el.querySelector('#video')
+        const vizCanvas = el.querySelector('#viz-canvas')
+        const vizCtx = vizCanvas.getContext('2d')
+
+        // Audio context + analyser
+        let audioCtx = null, analyser = null, sourceNode = null, audioEl = null
+        let freqData = new Uint8Array(64)
+
+        function setupAudio(src) {
+          if (audioEl) { audioEl.pause(); audioEl.remove() }
+          audioEl = new Audio(src)
+          audioEl.loop = true
+          audioEl.crossOrigin = 'anonymous'
+          if (!audioCtx) {
+            try { audioCtx = new (window.AudioContext || window.webkitAudioContext)() } catch (_) { audioCtx = null }
+          }
+          if (audioCtx && !analyser) {
+            analyser = audioCtx.createAnalyser()
+            analyser.fftSize = 128
+            try { sourceNode = audioCtx.createMediaElementSource(audioEl); sourceNode.connect(analyser); analyser.connect(audioCtx.destination) } catch (_) {}
+          }
+          return audioEl
+        }
+
+        let currentAudioEl = setupAudio(AUDIO_SOURCES[ctx.get().audioSrc])
+
+        function drawViz() {
+          const s = ctx.get()
+          const W = vizCanvas.width; const H = vizCanvas.height
+          vizCtx.clearRect(0, 0, W, H)
+          vizCtx.fillStyle = '#0a0a0f'
+          vizCtx.fillRect(0, 0, W, H)
+
+          if (analyser) {
+            analyser.getByteFrequencyData(freqData)
+          } else {
+            // Fake data for visual
+            const t = performance.now() / 1000
+            for (let i = 0; i < freqData.length; i++) {
+              freqData[i] = Math.sin(t * 3 + i * 0.3) * 80 + 80 + Math.random() * 40 * s.effectMix
+            }
+          }
+
+          const barW = W / freqData.length
+          vizCtx.fillStyle = `rgba(79,255,136,${0.4 + s.effectMix * 0.6})`
+          for (let i = 0; i < freqData.length; i++) {
+            const h = (freqData[i] / 255) * H * (0.6 + s.effectMix * 0.4)
+            const x = i * barW
+            // Mirror
+            vizCtx.fillRect(x, H / 2 - h / 2, barW - 1, h)
+            vizCtx.fillStyle = `hsla(${140 + i * 5 + s.effectMix * 40},80%,${40 + (freqData[i]/255)*30}%,${0.3 + s.effectMix * 0.5})`
+          }
+
+          // Circular waveform overlay
+          vizCtx.strokeStyle = `rgba(79,255,136,${0.6})`
+          vizCtx.lineWidth = 2
+          vizCtx.beginPath()
+          for (let i = 0; i < freqData.length; i++) {
+            const angle = (i / freqData.length) * Math.PI * 2
+            const r = 40 + (freqData[i] / 255) * 60 * s.effectMix
+            const x = W / 2 + Math.cos(angle) * r
+            const y = H / 2 + Math.sin(angle) * r
+            if (i === 0) vizCtx.moveTo(x, y)
+            else vizCtx.lineTo(x, y)
+          }
+          vizCtx.closePath()
+          vizCtx.stroke()
+        }
+
+        let raf, last = 0
+        function loop(now) {
+          const s = ctx.get()
+          if (last === 0) last = now
+          const dt = Math.min((now - last) / 1000, 0.2); last = now
+
+          if (s.playing) {
+            // Sync audio
+            if (currentAudioEl && currentAudioEl.paused) {
+              currentAudioEl.play().catch(() => {})
+            }
+            if (currentAudioEl) {
+              currentAudioEl.volume = s.volume
+              currentAudioEl.playbackRate = s.speed
+            }
+            // Sync video
+            if (video.paused) video.play().catch(() => {})
+            video.playbackRate = s.speed
+          } else {
+            if (currentAudioEl && !currentAudioEl.paused) currentAudioEl.pause()
+            if (!video.paused) video.pause()
+          }
+
+          drawViz()
+          raf = requestAnimationFrame(loop)
+        }
+        raf = requestAnimationFrame(loop)
+
+        // Watch for audio source changes
+        let prevAudio = ctx.get().audioSrc
+        const checkAudio = () => {
+          const s = ctx.get()
+          if (s.audioSrc !== prevAudio) {
+            prevAudio = s.audioSrc
+            const wasPlaying = !currentAudioEl.paused
+            currentAudioEl.pause()
+            currentAudioEl = setupAudio(AUDIO_SOURCES[s.audioSrc])
+            currentAudioEl.volume = s.volume
+            if (wasPlaying) currentAudioEl.play().catch(() => {})
+          }
+        }
+
+        const intervalId = setInterval(checkAudio, 200)
+        const onKey = (e) => {
+          if (e.key === ' ') { e.preventDefault(); ctx.send('togglePlay') }
+        }
+        window.addEventListener('keydown', onKey)
+
+        return () => {
+          cancelAnimationFrame(raf)
+          clearInterval(intervalId)
+          if (currentAudioEl) { currentAudioEl.pause(); currentAudioEl.remove() }
+          window.removeEventListener('keydown', onKey)
+          if (audioCtx) audioCtx.close().catch(() => {})
+        }
+      },
+    })
+
+    Demo.mount(document.body)
+  </script>
+</body>
+</html>

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kinetic Typography — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f; color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 60px 24px 40px; gap: 16px;
+    }
+    .back {
+      position: fixed; top: 16px; left: 16px;
+      color: #888; text-decoration: none; font-size: 14px; z-index: 100;
+    }
+    .back:hover { color: #fff; }
+    h1 { font-size: 1.25rem; font-weight: 600; color: #4f8; }
+    canvas {
+      width: min(800px, 90vw); height: 280px;
+      border-radius: 12px; background: #0a0a0f;
+      border: 1px solid #1a1a2e;
+    }
+    .controls {
+      width: min(800px, 90vw); display: flex; flex-wrap: wrap;
+      gap: 10px; align-items: center; justify-content: center;
+    }
+    .controls input, .controls select {
+      background: #151520; color: #e0e0e0; border: 1px solid #2a2a40;
+      padding: 6px 10px; border-radius: 6px; font-size: 13px; font-family: inherit;
+    }
+    .controls input[type="text"] { width: 260px; }
+    .controls input[type="range"] { width: 100px; accent-color: #4f8; }
+    .controls button {
+      background: #151520; color: #e0e0e0; border: 1px solid #2a2a40;
+      padding: 6px 14px; border-radius: 6px; font-size: 13px;
+      cursor: pointer; font-family: inherit;
+    }
+    .controls button.active { background: #4f8; color: #0a0a0f; border-color: #4f8; }
+    .controls label { font-size: 12px; color: #888; display: flex; align-items: center; gap: 4px; }
+    .info { font-size: 12px; color: #555; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+  <h1>41 · Kinetic Typography</h1>
+  <canvas id="canvas" width="800" height="280"></canvas>
+  <div class="controls" id="controls"></div>
+  <div class="info">Canvas per-character transforms · @uploop/timeline easing</div>
+
+  <script type="module">
+    import { html, component } from '@uploop/html'
+    import { easing } from '@uploop/timeline'
+
+    const presets = {
+      bounce: (i, n, t) => {
+        const d = i / n; const off = Math.sin(t * 4 + d * 6) * 20
+        return { x: 0, y: off, rot: 0, scale: 1 + Math.sin(t * 5 + d * 4) * 0.15 }
+      },
+      wave: (i, n, t) => {
+        const d = i / n
+        return { x: Math.sin(t * 3 + d * 8) * 30, y: Math.sin(t * 2.5 + d * 5) * 15, rot: Math.sin(t * 2 + d * 6) * 0.3, scale: 1 }
+      },
+      spiral: (i, n, t) => {
+        const d = i / n; const a = t * 2 + d * Math.PI * 2
+        return { x: Math.cos(a) * 50 * (1 - d), y: Math.sin(a) * 40 * (1 - d), rot: a, scale: 1 - d * 0.3 }
+      },
+      scatter: (i, n, t) => {
+        const seed = i * 0.73; const a = t * 1.5 + seed * 10
+        return { x: Math.cos(a) * 60, y: Math.sin(a) * 35 + Math.sin(t * 4 + seed) * 15, rot: Math.sin(t * 3 + seed) * 0.5, scale: 1 + Math.sin(t * 2 + seed) * 0.2 }
+      },
+    }
+
+    const palettes = {
+      rainbow: (i, n) => `hsl(${(i / n) * 360}, 80%, 60%)`,
+      gradient: (i, n) => {
+        const c1 = [0x4f, 0x88, 0xff]; const c2 = [0xff, 0x4f, 0x88]
+        const t = i / Math.max(n - 1, 1)
+        const r = Math.round(c1[0] + (c2[0] - c1[0]) * t)
+        const g = Math.round(c1[1] + (c2[1] - c1[1]) * t)
+        const b = Math.round(c1[2] + (c2[2] - c1[2]) * t)
+        return `rgb(${r},${g},${b})`
+      },
+      monochrome: () => '#e0e0e0',
+    }
+
+    let renderRaf = null
+
+    function draw(canvas, state, time) {
+      const ctx = canvas.getContext('2d')
+      const W = canvas.width = canvas.clientWidth * (window.devicePixelRatio || 1)
+      const H = canvas.height = canvas.clientHeight * (window.devicePixelRatio || 1)
+      ctx.scale(window.devicePixelRatio || 1, window.devicePixelRatio || 1)
+      const cw = canvas.clientWidth; const ch = canvas.clientHeight
+      ctx.clearRect(0, 0, cw, ch)
+
+      const chars = [...state.text]
+      const n = chars.length
+      if (n === 0) return
+      const t = time * state.speed
+      const fn = presets[state.preset] || presets.bounce
+      const palette = palettes[state.colorPalette] || palettes.rainbow
+      const fontSize = state.fontSize
+      const totalWidth = n * fontSize * 0.6
+      const startX = (cw - totalWidth) / 2 + fontSize * 0.3
+
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+
+      for (let i = 0; i < n; i++) {
+        const { x, y, rot, scale } = fn(i, n, t)
+        const cx = startX + i * fontSize * 0.6 + x
+        const cy = ch / 2 + y
+        ctx.save()
+        ctx.translate(cx, cy)
+        ctx.rotate(rot)
+        ctx.scale(scale, scale)
+        ctx.font = `bold ${fontSize}px system-ui, sans-serif`
+        ctx.fillStyle = palette(i, n)
+        ctx.fillText(chars[i], 0, 0)
+        ctx.restore()
+      }
+    }
+
+    const Demo = component('KineticType', {
+      state: {
+        text: 'UPLOOP',
+        preset: 'bounce',
+        speed: 1,
+        intensity: 1,
+        colorPalette: 'rainbow',
+        fontSize: 48,
+        playing: true,
+      },
+      update: {
+        setText: (s, t) => ({ ...s, text: t }),
+        setPreset: (s, p) => ({ ...s, preset: p }),
+        setSpeed: (s, v) => ({ ...s, speed: parseFloat(v) }),
+        setIntensity: (s, v) => ({ ...s, intensity: parseFloat(v) }),
+        setColorPalette: (s, p) => ({ ...s, colorPalette: p }),
+        setFontSize: (s, v) => ({ ...s, fontSize: parseInt(v) }),
+        togglePlay: (s) => ({ ...s, playing: !s.playing }),
+      },
+      view: (state, { send }) => html`
+        <a href="../.." class="back">← Examples</a>
+        <h1>41 · Kinetic Typography</h1>
+        <canvas id="canvas" width="800" height="280"></canvas>
+        <div class="controls">
+          <input type="text" value="${state.text}" @input=${(e) => send('setText', e.target.value)} placeholder="Type text..." />
+          <select @change=${(e) => send('setPreset', e.target.value)}>
+            ${Object.keys(presets).map(p => html`<option value="${p}" selected=${state.preset === p}>${p}</option>`)}
+          </select>
+          <label>Speed <input type="range" min="0.1" max="3" step="0.1" value="${state.speed}" @input=${(e) => send('setSpeed', e.target.value)} /></label>
+          <label>Size <input type="range" min="20" max="100" step="2" value="${state.fontSize}" @input=${(e) => send('setFontSize', e.target.value)} /></label>
+          <select @change=${(e) => send('setColorPalette', e.target.value)}>
+            ${Object.keys(palettes).map(p => html`<option value="${p}" selected=${state.colorPalette === p}>${p}</option>`)}
+          </select>
+          <button @click=${() => send('togglePlay')} class=${state.playing ? 'active' : ''}>
+            ${state.playing ? '⏸ Pause' : '▶ Play'}
+          </button>
+        </div>
+        <div class="info">Canvas per-character transforms · @uploop/timeline easing</div>
+      `,
+      mount(el, ctx) {
+        const canvas = el.querySelector('#canvas')
+        let startTime = null
+        let elapsed = 0
+        function loop(now) {
+          const state = ctx.get()
+          if (startTime === null) startTime = now
+          if (state.playing) {
+            elapsed += Math.min((now - (loop._last || now)) / 1000, 0.1)
+          }
+          loop._last = now
+          draw(canvas, state, elapsed)
+          renderRaf = requestAnimationFrame(loop)
+        }
+        renderRaf = requestAnimationFrame(loop)
+        const onResize = () => draw(canvas, ctx.get(), elapsed)
+        window.addEventListener('resize', onResize)
+        return () => { cancelAnimationFrame(renderRaf); window.removeEventListener('resize', onResize) }
+      },
+    })
+
+    Demo.mount(document.body)
+  </script>
+</body>
+</html>

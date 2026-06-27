@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Scrolling Marquee — uploop-vided</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                background: #0a0a0f;
+                color: #e0e0e0;
+                font-family: system-ui, sans-serif;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 60px 24px 40px;
+                gap: 16px;
+            }
+            .back {
+                position: fixed;
+                top: 16px;
+                left: 16px;
+                color: #888;
+                text-decoration: none;
+                font-size: 14px;
+                z-index: 100;
+            }
+            .back:hover {
+                color: #fff;
+            }
+            h1 {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: #4f8;
+            }
+            .marquee-stage {
+                width: min(800px, 90vw);
+                height: 140px;
+                border-radius: 12px;
+                background: #0d0d14;
+                border: 1px solid #1a1a2e;
+                overflow: hidden;
+                position: relative;
+                display: flex;
+                align-items: center;
+            }
+            .marquee-stage.vertical {
+                flex-direction: column;
+            }
+            .marquee-bar {
+                position: absolute;
+                inset: 0;
+                display: flex;
+                align-items: center;
+                pointer-events: none;
+            }
+            .marquee-bar.vertical {
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+            }
+            .marquee-ticker {
+                white-space: nowrap;
+                font-weight: 700;
+                will-change: transform;
+                color: #e0e0e0;
+            }
+            .controls {
+                width: min(800px, 90vw);
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                align-items: center;
+                justify-content: center;
+            }
+            .controls input,
+            .controls select {
+                background: #151520;
+                color: #e0e0e0;
+                border: 1px solid #2a2a40;
+                padding: 6px 10px;
+                border-radius: 6px;
+                font-size: 13px;
+                font-family: inherit;
+            }
+            .controls input[type="text"] {
+                width: 220px;
+            }
+            .controls input[type="range"] {
+                accent-color: #4f8;
+                width: 90px;
+            }
+            .controls input[type="color"] {
+                width: 32px;
+                height: 24px;
+                padding: 0;
+                border: none;
+            }
+            .controls button {
+                background: #151520;
+                color: #e0e0e0;
+                border: 1px solid #2a2a40;
+                padding: 6px 14px;
+                border-radius: 6px;
+                font-size: 13px;
+                cursor: pointer;
+                font-family: inherit;
+            }
+            .controls button.active {
+                background: #4f8;
+                color: #0a0a0f;
+                border-color: #4f8;
+            }
+            .controls label {
+                font-size: 12px;
+                color: #888;
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+            .info {
+                font-size: 12px;
+                color: #555;
+                margin-top: 4px;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>46 · Scrolling Marquee / Ticker</h1>
+        <div class="marquee-stage" id="stage">
+            <div class="marquee-bar" id="bar">
+                <div class="marquee-ticker" id="ticker"></div>
+            </div>
+        </div>
+        <div class="controls" id="controls"></div>
+        <div class="info">Seamless loop ticker · @uploop/timeline easing</div>
+
+        <script type="module">
+            import { html, component } from "@uploop/html";
+            import { easing } from "@uploop/timeline";
+
+            const STYLES = {
+                "stock-ticker": {
+                    bg: "linear-gradient(90deg, #0a0a0f 0%, #111 50%, #0a0a0f 100%)",
+                    font: "monospace",
+                    color: "#4f8",
+                    barBg: "#0a0a0f",
+                },
+                "news-flash": {
+                    bg: "linear-gradient(90deg, #1a0000 0%, #800 50%, #1a0000 100%)",
+                    font: "system-ui",
+                    color: "#fff",
+                    barBg: "#1a0000",
+                },
+                "cinema-credits": {
+                    bg: "linear-gradient(180deg, #0a0a0f 0%, #111 50%, #0a0a0f 100%)",
+                    font: "Georgia, serif",
+                    color: "#ffd700",
+                    barBg: "#0a0a0f",
+                },
+            };
+
+            const Demo = component("Marquee", {
+                state: {
+                    text: "★ UPLOOP VIDED — The multimedia editor SDK for the web ★  Canvas-powered video editing ★  Timeline sequencing ★  Keyframe animation ★",
+                    speed: 1,
+                    direction: 1, // 1 = left, -1 = right
+                    fontSize: 28,
+                    textColor: "#4f8",
+                    stylePreset: "stock-ticker",
+                    paused: false,
+                    vertical: false,
+                },
+                update: {
+                    setText: (s, t) => ({ ...s, text: t }),
+                    setSpeed: (s, v) => ({ ...s, speed: parseFloat(v) }),
+                    toggleDirection: (s) => ({
+                        ...s,
+                        direction: s.direction * -1,
+                    }),
+                    setFontSize: (s, v) => ({ ...s, fontSize: parseInt(v) }),
+                    setTextColor: (s, c) => ({ ...s, textColor: c }),
+                    setStylePreset: (s, p) => ({ ...s, stylePreset: p }),
+                    togglePause: (s) => ({ ...s, paused: !s.paused }),
+                    toggleVertical: (s) => ({ ...s, vertical: !s.vertical }),
+                },
+                view: (state, { send }) => {
+                    const style = STYLES[state.stylePreset];
+                    return html`
+                        <a href="../.." class="back">← Examples</a>
+                        <h1>46 · Scrolling Marquee / Ticker</h1>
+                        <div
+                            class="marquee-stage${state.vertical
+                                ? " vertical"
+                                : ""}"
+                            id="stage"
+                            style="background:${style.barBg};${state.vertical
+                                ? "height:280px;"
+                                : ""}"
+                        >
+                            <div
+                                class="marquee-bar${state.vertical
+                                    ? " vertical"
+                                    : ""}"
+                                id="bar"
+                            >
+                                <div
+                                    class="marquee-ticker"
+                                    id="ticker"
+                                    style="
+                font-family:${style.font}; font-size:${state.fontSize}px;
+                color:${state.textColor}; white-space:${state.vertical
+                                        ? "normal"
+                                        : "nowrap"};
+                ${state.vertical
+                                        ? "writing-mode:vertical-rl;text-orientation:mixed;"
+                                        : ""}
+              "
+                                >
+                                    ${state.text.repeat(3)}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="controls">
+                            <input
+                                type="text"
+                                value="${state.text}"
+                                @input=${(e) => send("setText", e.target.value)}
+                            />
+                            <select
+                                @change=${(e) =>
+                                    send("setStylePreset", e.target.value)}
+                            >
+                                ${Object.keys(STYLES).map(
+                                    (s) =>
+                                        html`<option
+                                            value="${s}"
+                                            selected=${state.stylePreset === s}
+                                        >
+                                            ${s}
+                                        </option>`,
+                                )}
+                            </select>
+                            <label
+                                >Speed
+                                <input
+                                    type="range"
+                                    min="0.1"
+                                    max="5"
+                                    step="0.1"
+                                    value="${state.speed}"
+                                    @input=${(e) =>
+                                        send("setSpeed", e.target.value)}
+                            /></label>
+                            <label
+                                >Size
+                                <input
+                                    type="range"
+                                    min="16"
+                                    max="60"
+                                    step="2"
+                                    value="${state.fontSize}"
+                                    @input=${(e) =>
+                                        send("setFontSize", e.target.value)}
+                            /></label>
+                            <label
+                                >Color
+                                <input
+                                    type="color"
+                                    value="${state.textColor}"
+                                    @input=${(e) =>
+                                        send("setTextColor", e.target.value)}
+                            /></label>
+                            <button @click=${() => send("toggleDirection")}>
+                                ⇄ ${state.direction > 0 ? "←" : "→"}
+                            </button>
+                            <button @click=${() => send("toggleVertical")}>
+                                ↕ V
+                            </button>
+                            <button
+                                @click=${() => send("togglePause")}
+                                class=${state.paused ? "" : "active"}
+                            >
+                                ${state.paused ? "▶ Play" : "⏸ Hover"}
+                            </button>
+                        </div>
+                        <div class="info">
+                            Seamless loop ticker · @uploop/timeline easing
+                        </div>
+                    `;
+                },
+                mount(el, ctx) {
+                    const ticker = el.querySelector("#ticker");
+                    const bar = el.querySelector("#bar");
+                    let offset = 0;
+                    let last = 0;
+                    let raf;
+                    function loop(now) {
+                        const s = ctx.get();
+                        if (last === 0) last = now;
+                        const dt = Math.min((now - last) / 1000, 0.1);
+                        last = now;
+                        if (!s.paused) {
+                            offset += s.speed * 120 * s.direction * dt;
+                            if (s.vertical) {
+                                const h = ticker.offsetHeight;
+                                if (Math.abs(offset) > h / 3)
+                                    offset = offset % (h / 3);
+                                ticker.style.transform = `translateY(${offset}px)`;
+                            } else {
+                                const w = ticker.scrollWidth;
+                                if (Math.abs(offset) > w / 3)
+                                    offset = offset % (w / 3);
+                                ticker.style.transform = `translateX(${offset}px)`;
+                            }
+                        }
+                        raf = requestAnimationFrame(loop);
+                    }
+                    raf = requestAnimationFrame(loop);
+                    // Pause on hover
+                    const stage = el.querySelector("#stage");
+                    let hovered = false;
+                    const onEnter = () => {
+                        hovered = true;
+                        const s = ctx.get();
+                        if (!s.paused) ctx.send("togglePause");
+                    };
+                    const onLeave = () => {
+                        if (hovered) {
+                            hovered = false;
+                            const s = ctx.get();
+                            if (s.paused) ctx.send("togglePause");
+                        }
+                    };
+                    stage.addEventListener("mouseenter", onEnter);
+                    stage.addEventListener("mouseleave", onLeave);
+                    return () => {
+                        cancelAnimationFrame(raf);
+                        stage.removeEventListener("mouseenter", onEnter);
+                        stage.removeEventListener("mouseleave", onLeave);
+                    };
+                },
+            });
+
+            Demo.mount(document.body);
+        </script>
+    </body>
+</html>

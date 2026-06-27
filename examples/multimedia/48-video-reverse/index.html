@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Reverse Playback — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f; color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 60px 24px 40px; gap: 16px;
+    }
+    .back {
+      position: fixed; top: 16px; left: 16px;
+      color: #888; text-decoration: none; font-size: 14px; z-index: 100;
+    }
+    .back:hover { color: #fff; }
+    h1 { font-size: 1.25rem; font-weight: 600; color: #4f8; }
+    .stage {
+      width: min(800px, 90vw); border-radius: 12px; overflow: hidden;
+      background: #000; border: 1px solid #1a1a2e;
+    }
+    video { display: block; width: 100%; border-radius: 12px; }
+    .controls {
+      width: min(800px, 90vw); display: flex; flex-wrap: wrap;
+      gap: 10px; align-items: center; justify-content: center;
+    }
+    .controls button {
+      background: #151520; color: #e0e0e0; border: 1px solid #2a2a40;
+      padding: 6px 14px; border-radius: 6px; font-size: 13px;
+      cursor: pointer; font-family: inherit;
+    }
+    .controls button.active { background: #4f8; color: #0a0a0f; border-color: #4f8; }
+    .controls input[type="range"] { accent-color: #4f8; width: 100px; }
+    .controls label { font-size: 12px; color: #888; display: flex; align-items: center; gap: 4px; }
+    .frame-counter {
+      font-family: monospace; font-size: 1.1rem; color: #888;
+      text-align: center;
+    }
+    .progress-bar {
+      width: min(800px, 90vw); height: 4px; background: #1a1a2e;
+      border-radius: 2px; overflow: hidden; cursor: pointer;
+    }
+    .progress-fill { height: 100%; background: #4f8; border-radius: 2px; }
+    .info { font-size: 12px; color: #555; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+  <h1>48 · Reverse Playback</h1>
+  <div class="stage">
+    <video id="video" src="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4" muted loop playsinline></video>
+  </div>
+  <div class="frame-counter" id="counter">Frame 0 / 240</div>
+  <div class="progress-bar" id="pbar"><div class="progress-fill" id="pfill" style="width:0%"></div></div>
+  <div class="controls" id="controls"></div>
+  <div class="info">Reverse playback simulation via frame seeking · @uploop/timeline easing</div>
+
+  <script type="module">
+    import { html, component } from '@uploop/html'
+    import { easing } from '@uploop/timeline'
+
+    const VIDEO_SRC = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4'
+    const FPS = 24
+    const DURATION = 10
+    const TOTAL_FRAMES = FPS * DURATION
+
+    const Demo = component('ReversePlayback', {
+      state: { playing: false, reverse: false, speed: 1, frame: 0, pingPong: false, direction: 1 },
+      update: {
+        togglePlay: (s) => ({ ...s, playing: !s.playing }),
+        toggleReverse: (s) => {
+          const newRev = !s.reverse
+          return { ...s, reverse: newRev, direction: newRev ? -1 : 1 }
+        },
+        togglePingPong: (s) => ({ ...s, pingPong: !s.pingPong }),
+        setSpeed: (s, v) => ({ ...s, speed: parseFloat(v) }),
+        seek: (s, pct) => ({ ...s, frame: Math.round(pct * TOTAL_FRAMES) }),
+        tick: (s, dt) => {
+          if (!s.playing) return s
+          const dir = s.pingPong ? s.direction : (s.reverse ? -1 : 1)
+          let newFrame = s.frame + dir * s.speed * FPS * dt
+          if (s.pingPong) {
+            if (newFrame >= TOTAL_FRAMES) { newFrame = TOTAL_FRAMES - 1; return { ...s, frame: newFrame, direction: -1 } }
+            if (newFrame <= 0) { newFrame = 0; return { ...s, frame: 0, direction: 1 } }
+          } else {
+            if (newFrame >= TOTAL_FRAMES) newFrame = 0
+            if (newFrame < 0) newFrame = TOTAL_FRAMES - 1
+          }
+          return { ...s, frame: Math.max(0, Math.min(TOTAL_FRAMES - 1, Math.round(newFrame))) }
+        },
+      },
+      view: (state, { send }) => {
+        const pct = (state.frame / TOTAL_FRAMES) * 100
+        const time = state.frame / FPS
+        const dirLabel = state.pingPong
+          ? (state.direction > 0 ? '→ Forward' : '← Reverse')
+          : (state.reverse ? '⟲ Reverse' : '→ Forward')
+        return html`
+          <a href="../.." class="back">← Examples</a>
+          <h1>48 · Reverse Playback</h1>
+          <div class="stage">
+            <video id="video" src="${VIDEO_SRC}" muted playsinline></video>
+          </div>
+          <div class="frame-counter">Frame ${state.frame} / ${TOTAL_FRAMES} · ${time.toFixed(2)}s · ${dirLabel}</div>
+          <div class="progress-bar" @click=${(e) => {
+            const r = e.currentTarget.getBoundingClientRect(); send('seek', (e.clientX - r.left) / r.width)
+          }}>
+            <div class="progress-fill" style="width:${pct}%"></div>
+          </div>
+          <div class="controls">
+            <button @click=${() => send('togglePlay')} class=${state.playing ? 'active' : ''}>
+              ${state.playing ? '⏸ Pause' : '▶ Play'}
+            </button>
+            <button @click=${() => send('toggleReverse')} class=${state.reverse && !state.pingPong ? 'active' : ''}>
+              ⟲ Rev
+            </button>
+            <button @click=${() => send('togglePingPong')} class=${state.pingPong ? 'active' : ''}>
+              ⇄ Ping-Pong
+            </button>
+            <label>Speed <input type="range" min="0.1" max="4" step="0.1" value="${state.speed}" @input=${(e) => send('setSpeed', e.target.value)} /></label>
+          </div>
+          <div class="info">Reverse playback simulation via frame seeking · @uploop/timeline easing</div>
+        `
+      },
+      mount(el, ctx) {
+        const video = el.querySelector('#video')
+        let raf, last = 0
+        function loop(now) {
+          if (last === 0) last = now
+          const dt = Math.min((now - last) / 1000, 0.2); last = now
+          const s = ctx.get()
+          if (s.playing) {
+            ctx.send('tick', dt)
+            const ns = ctx.get()
+            const t = ns.frame / FPS
+            if (Math.abs(video.currentTime - (t % DURATION)) > 0.1) {
+              video.currentTime = t % DURATION
+            }
+            if (video.paused) video.play().catch(() => {})
+          } else {
+            if (!video.paused) video.pause()
+          }
+          raf = requestAnimationFrame(loop)
+        }
+        raf = requestAnimationFrame(loop)
+        const onKey = (e) => {
+          if (e.key === ' ') { e.preventDefault(); ctx.send('togglePlay') }
+          if (e.key === 'r') { e.preventDefault(); ctx.send('toggleReverse') }
+          if (e.key === 'p') { e.preventDefault(); ctx.send('togglePingPong') }
+        }
+        window.addEventListener('keydown', onKey)
+        return () => { cancelAnimationFrame(raf); video.pause(); window.removeEventListener('keydown', onKey) }
+      },
+    })
+
+    Demo.mount(document.body)
+  </script>
+</body>
+</html>

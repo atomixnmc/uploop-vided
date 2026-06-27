@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slow Motion / Speed Ramp — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f; color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 60px 24px 40px; gap: 16px;
+    }
+    .back {
+      position: fixed; top: 16px; left: 16px;
+      color: #888; text-decoration: none; font-size: 14px; z-index: 100;
+    }
+    .back:hover { color: #fff; }
+    h1 { font-size: 1.25rem; font-weight: 600; color: #4f8; }
+    .stage {
+      width: min(800px, 90vw); border-radius: 12px; overflow: hidden;
+      background: #000; border: 1px solid #1a1a2e;
+    }
+    video { display: block; width: 100%; border-radius: 12px; }
+    .controls {
+      width: min(800px, 90vw); display: flex; flex-wrap: wrap;
+      gap: 10px; align-items: center; justify-content: center;
+    }
+    .controls button {
+      background: #151520; color: #e0e0e0; border: 1px solid #2a2a40;
+      padding: 6px 14px; border-radius: 6px; font-size: 13px;
+      cursor: pointer; font-family: inherit;
+    }
+    .controls button.active { background: #4f8; color: #0a0a0f; border-color: #4f8; }
+    .controls button.speed-preset { min-width: 50px; }
+    .controls input[type="range"] { accent-color: #4f8; width: 120px; }
+    .controls label { font-size: 12px; color: #888; display: flex; align-items: center; gap: 4px; }
+    .speed-display {
+      font-size: 2rem; font-weight: 700; font-family: monospace;
+      color: #4f8; text-align: center; min-width: 80px;
+    }
+    .info { font-size: 12px; color: #555; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+  <h1>47 · Slow Motion / Speed Ramp</h1>
+  <div class="stage">
+    <video id="video" src="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4" muted loop playsinline></video>
+  </div>
+  <div class="speed-display" id="speed-label">1.00×</div>
+  <div class="controls" id="controls"></div>
+  <div class="info">Real-time playback speed control · @uploop/timeline easing</div>
+
+  <script type="module">
+    import { html, component } from '@uploop/html'
+    import { easing } from '@uploop/timeline'
+
+    const SPEED_PRESETS = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4]
+
+    const Demo = component('SlowMo', {
+      state: { playing: false, speed: 1, currentTime: 0, duration: 10 },
+      update: {
+        togglePlay: (s) => ({ ...s, playing: !s.playing }),
+        setSpeed: (s, v) => ({ ...s, speed: parseFloat(v) }),
+        frameStep: (s, dir) => {
+          const fps = 24
+          return { ...s, currentTime: Math.max(0, Math.min(s.duration, s.currentTime + dir / fps)) }
+        },
+        seek: (s, pct) => ({ ...s, currentTime: Math.max(0, Math.min(s.duration, pct * s.duration)) }),
+        tick: (s, dt) => {
+          if (!s.playing) return s
+          const t = s.currentTime + dt * s.speed
+          if (t >= s.duration) return { ...s, currentTime: 0 }
+          return { ...s, currentTime: t }
+        },
+      },
+      view: (state, { send }) => {
+        const pct = (state.currentTime / state.duration) * 100
+        return html`
+          <a href="../.." class="back">← Examples</a>
+          <h1>47 · Slow Motion / Speed Ramp</h1>
+          <div class="stage">
+            <video id="video"
+              src="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4"
+              muted loop playsinline
+            ></video>
+          </div>
+          <div class="speed-display">${state.speed.toFixed(2)}×</div>
+          <div class="controls">
+            <button @click=${() => send('togglePlay')} class=${state.playing ? 'active' : ''}>
+              ${state.playing ? '⏸ Pause' : '▶ Play'}
+            </button>
+            <button @click=${() => send('frameStep', -1)}>⏮ Frame</button>
+            <button @click=${() => send('frameStep', 1)}>Frame ⏭</button>
+            <label>Speed <input type="range" min="0.1" max="4" step="0.05" value="${state.speed}" @input=${(e) => send('setSpeed', e.target.value)} /></label>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;">
+              ${SPEED_PRESETS.map(sp => html`
+                <button class="speed-preset ${Math.abs(state.speed - sp) < 0.01 ? 'active' : ''}" @click=${() => send('setSpeed', sp)}>
+                  ${sp}×
+                </button>
+              `)}
+            </div>
+          </div>
+          <!-- Progress bar -->
+          <div style="width:min(800px,90vw);height:4px;background:#1a1a2e;border-radius:2px;overflow:hidden;cursor:pointer;"
+            @click=${(e) => { const r = e.currentTarget.getBoundingClientRect(); send('seek', (e.clientX - r.left) / r.width) }}>
+            <div style="height:100%;background:#4f8;border-radius:2px;width:${pct}%;"></div>
+          </div>
+          <div class="info">Real-time playback speed control · @uploop/timeline easing</div>
+        `
+      },
+      mount(el, ctx) {
+        const video = el.querySelector('#video')
+        let raf, last = 0
+        function loop(now) {
+          if (last === 0) last = now
+          const dt = Math.min((now - last) / 1000, 0.2); last = now
+          const s = ctx.get()
+          if (s.playing) {
+            ctx.send('tick', dt)
+            if (!video.paused) { video.playbackRate = s.speed; if (Math.abs(video.currentTime - s.currentTime) > 0.3) video.currentTime = s.currentTime % s.duration }
+            else video.play().catch(() => {})
+          } else {
+            if (!video.paused) video.pause()
+          }
+          // Sync video
+          if (video.currentTime !== undefined && Math.abs(video.currentTime - s.currentTime) > 0.15) {
+            video.currentTime = s.currentTime % s.duration
+          }
+          raf = requestAnimationFrame(loop)
+        }
+        raf = requestAnimationFrame(loop)
+        const onKey = (e) => {
+          if (e.key === ' ') { e.preventDefault(); ctx.send('togglePlay') }
+          if (e.key === 'ArrowLeft') { e.preventDefault(); ctx.send('frameStep', -1) }
+          if (e.key === 'ArrowRight') { e.preventDefault(); ctx.send('frameStep', 1) }
+        }
+        window.addEventListener('keydown', onKey)
+        return () => { cancelAnimationFrame(raf); video.pause(); window.removeEventListener('keydown', onKey) }
+      },
+    })
+
+    Demo.mount(document.body)
+  </script>
+</body>
+</html>

@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Music Bars — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 24px 40px;
+      gap: 14px;
+    }
+    .back {
+      position: fixed; top: 16px; left: 16px;
+      color: #888; text-decoration: none; font-size: 14px; z-index: 100;
+    }
+    .back:hover { color: #fff; }
+    .title-bar {
+      width: min(960px, 90vw);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .title-bar h1 { font-size: 1.25rem; font-weight: 600; color: #4f8; }
+    .title-bar span { font-size: 12px; color: #666; }
+    canvas {
+      width: min(960px, 90vw);
+      height: 360px;
+      background: #151520;
+      border-radius: 12px;
+      border: 1px solid #252535;
+      display: block;
+    }
+    .controls {
+      width: min(960px, 90vw);
+      background: #151520;
+      border-radius: 10px;
+      padding: 14px 20px;
+      display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    }
+    .control-group {
+      display: flex; flex-direction: column; gap: 3px;
+    }
+    .control-group label {
+      font-size: 11px; color: #888;
+    }
+    .control-group .val {
+      font-size: 11px; color: #4f8; font-family: 'Courier New', monospace;
+    }
+    .control-group input[type="range"] { accent-color: #4f8; width: 100px; }
+    button {
+      background: #1e1e30; color: #e0e0e0; border: 1px solid #333;
+      padding: 8px 16px; border-radius: 8px; cursor: pointer;
+      font-size: 13px; transition: all 0.2s; white-space: nowrap;
+    }
+    button:hover { background: #2a2a40; }
+    button.active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    button.playing { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .bar-count-btns { display: flex; gap: 4px; }
+    .bar-count-btns button { padding: 6px 12px; font-size: 11px; }
+    .bar-count-btns button.active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .info-box {
+      width: min(960px, 90vw);
+      background: #0f0f1a;
+      border: 1px solid #252535;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 12px; color: #aaa;
+      display: flex; gap: 24px; flex-wrap: wrap;
+    }
+    .info-box span { color: #f8c040; font-family: 'Courier New', monospace; }
+    .info-box code { color: #4f8; }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+  <div id="root"></div>
+
+  <script type="module">
+    import { html, component } from '@uploop/html'
+    import { easing } from '@uploop/timeline'
+    import { blendModes } from '@uploop/compositor'
+
+    const DEFAULT_AUDIO = 'https://www.samplelib.com/lib/preview/mp3/sample-15s.mp3'
+
+    const MusicBars = component('MusicBars', {
+      state: {
+        playing: false, barCount: 64, volume: 0.7,
+        bassPeak: 0, peakFreq: 0,
+        uploadLabel: 'Load Audio',
+      },
+      update: {
+        togglePlay: (s) => ({ ...s, playing: !s.playing }),
+        setPlaying: (s, p) => ({ ...s, playing: p }),
+        setBarCount: (s, n) => ({ ...s, barCount: n }),
+        setVolume: (s, v) => ({ ...s, volume: v }),
+        setLabel: (s, l) => ({ ...s, uploadLabel: l }),
+        setBassPeak: (s, v) => ({ ...s, bassPeak: v }),
+        setPeakFreq: (s, v) => ({ ...s, peakFreq: v }),
+      },
+      view: (state, { send }) => html`
+        <div class="title-bar">
+          <h1>🎵 Music Bars — FFT Frequency Visualizer</h1>
+          <span>Web Audio API · Peak Hold · Gradient Bars</span>
+        </div>
+        <canvas id="viz"></canvas>
+        <div class="controls">
+          <button id="playBtn" class="${state.playing ? 'playing' : ''}" onclick=${() => send('togglePlay')}>
+            ${state.playing ? '⏸ Pause' : '▶ Play'}
+          </button>
+          <div class="control-group">
+            <label>Volume <span class="val">${(state.volume * 100).toFixed(0)}%</span></label>
+            <input type="range" id="volSlider" min="0" max="1" step="0.05" value="${state.volume}"
+              oninput=${(e) => send('setVolume', Number(e.target.value))} />
+          </div>
+          <label for="fileUpload" style="cursor:pointer; background:#1e1e30; color:#e0e0e0; border:1px solid #333; padding:8px 16px; border-radius:8px; font-size:13px;">
+            📁 ${state.uploadLabel}
+          </label>
+          <input type="file" id="fileUpload" accept="audio/*" style="display:none"
+            onchange=${(e) => {
+              const file = e.target.files?.[0]
+              if (file) { send('setLabel', file.name); send('loadFile', file) }
+            }} />
+          <div class="bar-count-btns">
+            ${[32, 64, 128].map(n => html`
+              <button class="${state.barCount === n ? 'active' : ''}" onclick=${() => send('setBarCount', n)}>${n}</button>
+            `)}
+          </div>
+        </div>
+        <div class="info-box">
+          <div>Bass Peak: <span id="bassPeak">0.00</span></div>
+          <div>Peak Freq: <span id="peakFreq">0</span> Hz</div>
+          <div>Using <code>@uploop/timeline</code> easing · <code>@uploop/compositor</code></div>
+        </div>
+      `,
+      mount(el, ctx) {
+        const canvas = el.querySelector('#viz')
+        const ctx2d = canvas.getContext('2d')
+        let audioCtx, analyser, source, audioEl, rafId, dataArray
+        let smoothed = []
+        let peakHolds = []
+        let peakDecays = []
+        let animationId = null
+
+        function resize() {
+          const rect = canvas.getBoundingClientRect()
+          canvas.width = rect.width * devicePixelRatio
+          canvas.height = rect.height * devicePixelRatio
+        }
+
+        async function loadDefaultAudio() {
+          try {
+            const res = await fetch(DEFAULT_AUDIO)
+            const blob = await res.blob()
+            const url = URL.createObjectURL(blob)
+            loadAudio(url)
+            ctx.send('setLabel', 'Sample MP3')
+          } catch (e) {
+            console.warn('Default audio load failed:', e.message)
+          }
+        }
+
+        function loadAudio(url) {
+          stopAudio()
+          audioCtx = new (window.AudioContext || window.webkitAudioContext)()
+          analyser = audioCtx.createAnalyser()
+          analyser.fftSize = Math.max(ctx.get().barCount * 2, 256)
+          analyser.smoothingTimeConstant = 0.6
+          audioEl = new Audio(url)
+          audioEl.crossOrigin = 'anonymous'
+          audioEl.loop = true
+          audioEl.volume = ctx.get().volume
+          source = audioCtx.createMediaElementSource(audioEl)
+          const gainNode = audioCtx.createGain()
+          gainNode.gain.value = ctx.get().volume
+          source.connect(gainNode)
+          gainNode.connect(analyser)
+          analyser.connect(audioCtx.destination)
+          dataArray = new Uint8Array(analyser.frequencyBinCount)
+          smoothed = new Array(ctx.get().barCount).fill(0)
+          peakHolds = new Array(ctx.get().barCount).fill(0)
+          peakDecays = new Array(ctx.get().barCount).fill(0)
+          audioEl.play()
+          ctx.send('setPlaying', true)
+          resize()
+          loop()
+        }
+
+        function stopAudio() {
+          if (animationId) cancelAnimationFrame(animationId)
+          if (audioEl) { audioEl.pause(); audioEl.src = '' }
+          if (source) source.disconnect()
+          if (audioCtx && audioCtx.state !== 'closed') audioCtx.close()
+          audioEl = null; source = null; analyser = null; audioCtx = null
+        }
+
+        function getFreqRange(startIdx, endIdx) {
+          let sum = 0
+          for (let i = startIdx; i < endIdx; i++) sum += dataArray[i] / 255
+          return sum / (endIdx - startIdx)
+        }
+
+        function render() {
+          const W = canvas.width, H = canvas.height
+          const bc = ctx.get().barCount
+          ctx2d.clearRect(0, 0, W, H)
+
+          if (!analyser) return
+          analyser.getByteFrequencyData(dataArray)
+
+          const totalBins = analyser.frequencyBinCount
+          const sampleRate = audioCtx.sampleRate
+          const nyquist = sampleRate / 2
+
+          // Log-scale frequency binning
+          const minFreq = 20
+          const maxFreq = nyquist * 0.9
+          const logMin = Math.log2(minFreq)
+          const logMax = Math.log2(maxFreq)
+
+          let bassSum = 0
+          let maxVal = 0, maxIdx = 0
+          const barW = W / bc
+          const gap = barW * 0.15
+
+          for (let i = 0; i < bc; i++) {
+            const t = i / bc
+            const freq = Math.pow(2, logMin + t * (logMax - logMin))
+            const idx = Math.floor(freq / nyquist * totalBins)
+            const clamped = Math.min(idx, totalBins - 1)
+            let val = dataArray[clamped] / 255
+
+            // Smooth
+            smoothed[i] = smoothed[i] * 0.7 + val * 0.3
+
+            // Peak hold
+            if (smoothed[i] > peakHolds[i]) {
+              peakHolds[i] = smoothed[i]
+              peakDecays[i] = 1
+            } else {
+              peakDecays[i] *= 0.96
+              peakHolds[i] *= 0.992
+            }
+
+            const hue = 220 + (i / bc) * 180 // blue → magenta
+            const sat = 80 + val * 20
+            const lum = 40 + smoothed[i] * 40
+
+            // Bar
+            const barH = smoothed[i] * (H - 40)
+            const x = i * barW
+            const grad = ctx2d.createLinearGradient(x, H - barH, x, H)
+            grad.addColorStop(0, `hsl(${hue},${sat}%,${lum + 20}%)`)
+            grad.addColorStop(1, `hsl(${hue},${sat}%,${lum}%)`)
+            ctx2d.fillStyle = grad
+            ctx2d.fillRect(x + gap / 2, H - barH, barW - gap, barH)
+
+            // Glow top
+            const glowGrad = ctx2d.createLinearGradient(x, H - barH - 6, x, H - barH)
+            glowGrad.addColorStop(0, 'rgba(0,0,0,0)')
+            glowGrad.addColorStop(1, `hsla(${hue},${sat}%,${lum + 30}%,0.4)`)
+            ctx2d.fillStyle = glowGrad
+            ctx2d.fillRect(x + gap / 2, H - barH - 6, barW - gap, 6)
+
+            // Peak dot
+            if (peakHolds[i] > 0.01) {
+              const py = H - peakHolds[i] * (H - 40)
+              ctx2d.fillStyle = `hsl(${hue},100%,70%)`
+              ctx2d.beginPath()
+              ctx2d.arc(x + barW / 2, py, 3, 0, Math.PI * 2)
+              ctx2d.fill()
+            }
+
+            // Bass (first 25% of bars)
+            if (i < bc * 0.25) bassSum += smoothed[i]
+            if (smoothed[i] > maxVal) { maxVal = smoothed[i]; maxIdx = clamped }
+          }
+
+          // Bass meter
+          const bassNorm = bassSum / (bc * 0.25)
+          const freqAtMax = Math.round(maxIdx / totalBins * nyquist)
+          el.querySelector('#bassPeak').textContent = bassNorm.toFixed(2)
+          el.querySelector('#peakFreq').textContent = freqAtMax
+
+          // Frequency labels (bottom)
+          ctx2d.fillStyle = '#666'
+          ctx2d.font = '10px monospace'
+          const labels = [50, 200, 1000, 5000, 15000]
+          for (const lf of labels) {
+            const t = (Math.log2(lf) - logMin) / (logMax - logMin)
+            const lx = t * W
+            if (lx > 0 && lx < W) {
+              const label = lf >= 1000 ? `${(lf / 1000).toFixed(0)}k` : `${lf}`
+              ctx2d.fillText(label, lx - 12, H - 4)
+              ctx2d.strokeStyle = '#1a1a28'
+              ctx2d.beginPath(); ctx2d.moveTo(lx, H - 20); ctx2d.lineTo(lx, H - 8); ctx2d.stroke()
+            }
+          }
+        }
+
+        function loop() {
+          render()
+          animationId = requestAnimationFrame(loop)
+        }
+
+        // Handle state changes
+        const origSend = ctx.send
+        ctx.send = function(action, payload) {
+          if (action === 'loadFile' && payload) {
+            const url = URL.createObjectURL(payload)
+            loadAudio(url)
+          }
+          if (action === 'setBarCount') {
+            if (analyser) {
+              analyser.fftSize = Math.max(payload * 2, 256)
+              dataArray = new Uint8Array(analyser.frequencyBinCount)
+              smoothed = new Array(payload).fill(0)
+              peakHolds = new Array(payload).fill(0)
+              peakDecays = new Array(payload).fill(0)
+            }
+          }
+          if (action === 'setVolume') {
+            if (audioEl) audioEl.volume = payload
+          }
+          if (action === 'togglePlay') {
+            if (audioEl) {
+              if (audioEl.paused) { audioEl.play(); ctx.send('setPlaying', true) }
+              else { audioEl.pause(); ctx.send('setPlaying', false) }
+            } else {
+              loadDefaultAudio()
+            }
+          }
+          origSend(action, payload)
+        }
+
+        loadDefaultAudio()
+        window.addEventListener('resize', resize)
+
+        return () => {
+          stopAudio()
+          window.removeEventListener('resize', resize)
+        }
+      }
+    })
+
+    MusicBars.mount(document.getElementById('root'))
+  </script>
+</body>
+</html>

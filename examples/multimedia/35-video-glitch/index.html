@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Glitch — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f; color: #e0e0e0; font-family: system-ui, sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      padding: 60px 24px 40px; gap: 14px;
+    }
+    .back { position: fixed; top: 16px; left: 16px; color: #888; text-decoration: none; font-size: 14px; z-index: 100; }
+    .back:hover { color: #fff; }
+    .title-bar { width: min(960px, 90vw); display: flex; align-items: center; justify-content: space-between; }
+    .title-bar h1 { font-size: 1.25rem; font-weight: 600; color: #4f8; }
+    .title-bar span { font-size: 12px; color: #666; }
+    canvas {
+      width: min(960px, 90vw); height: 480px;
+      background: #151520; border-radius: 12px; border: 1px solid #252535; display: block;
+    }
+    .controls {
+      width: min(960px, 90vw); background: #151520; border-radius: 10px;
+      padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    }
+    .control-group { display: flex; flex-direction: column; gap: 3px; }
+    .control-group label { font-size: 11px; color: #888; }
+    .control-group .val { font-size: 11px; color: #4f8; font-family: 'Courier New', monospace; }
+    .control-group input[type="range"] { accent-color: #4f8; width: 110px; }
+    button {
+      background: #1e1e30; color: #e0e0e0; border: 1px solid #333;
+      padding: 8px 16px; border-radius: 8px; cursor: pointer;
+      font-size: 13px; transition: all 0.2s; white-space: nowrap;
+    }
+    button:hover { background: #2a2a40; }
+    button.playing { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    button.frozen { background: #3a2525; border-color: #ff6040; color: #ff6040; }
+    .info-box {
+      width: min(960px, 90vw); background: #0f0f1a; border: 1px solid #252535;
+      border-radius: 8px; padding: 10px 18px; font-size: 12px; color: #aaa;
+      display: flex; gap: 24px; flex-wrap: wrap;
+    }
+    .info-box span { color: #f8c040; font-family: 'Courier New', monospace; }
+    .info-box code { color: #4f8; }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+  <div id="root"></div>
+
+  <script type="module">
+    import { html, component } from '@uploop/html'
+    import { easing } from '@uploop/timeline'
+    import { blendModes } from '@uploop/compositor'
+
+    const BBB_VIDEO = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4'
+
+    const VideoGlitch = component('VideoGlitch', {
+      state: {
+        playing: false, frozen: false,
+        rgbShift: 4, scanLines: 5, noise: 2,
+        fps: 0,
+      },
+      update: {
+        togglePlay: (s) => ({ ...s, playing: !s.playing }),
+        setPlaying: (s, p) => ({ ...s, playing: p }),
+        toggleFreeze: (s) => ({ ...s, frozen: !s.frozen }),
+        setRgbShift: (s, v) => ({ ...s, rgbShift: v }),
+        setScanLines: (s, v) => ({ ...s, scanLines: v }),
+        setNoise: (s, v) => ({ ...s, noise: v }),
+        setFps: (s, v) => ({ ...s, fps: v }),
+      },
+      view: (state, { send }) => html`
+        <div class="title-bar">
+          <h1>📺 Video Glitch — Distortion Effects</h1>
+          <span>RGB Shift · Scan Lines · Digital Noise</span>
+        </div>
+        <canvas id="viz"></canvas>
+        <div class="controls">
+          <button id="playBtn" class="${state.playing ? 'playing' : ''}" onclick=${() => send('togglePlay')}>
+            ${state.playing ? '⏸ Pause' : '▶ Play'}
+          </button>
+          <button id="freezeBtn" class="${state.frozen ? 'frozen' : ''}" onclick=${() => send('toggleFreeze')}>
+            ${state.frozen ? '❄ Unfreeze' : '❄ Freeze'}
+          </button>
+          <button onclick=${() => send('randomGlitch')}>⚡ Random Glitch</button>
+          <div class="control-group">
+            <label>RGB Shift <span class="val">${state.rgbShift}px</span></label>
+            <input type="range" min="0" max="30" step="1" value="${state.rgbShift}"
+              oninput=${(e) => send('setRgbShift', Number(e.target.value))} />
+          </div>
+          <div class="control-group">
+            <label>Scan Lines <span class="val">${state.scanLines}</span></label>
+            <input type="range" min="0" max="15" step="1" value="${state.scanLines}"
+              oninput=${(e) => send('setScanLines', Number(e.target.value))} />
+          </div>
+          <div class="control-group">
+            <label>Noise <span class="val">${state.noise}%</span></label>
+            <input type="range" min="0" max="20" step="1" value="${state.noise}"
+              oninput=${(e) => send('setNoise', Number(e.target.value))} />
+          </div>
+        </div>
+        <div class="info-box">
+          <div>FPS: <span id="fpsVal">0</span></div>
+          <div>Resolution: <span id="resVal">-</span></div>
+          <div>Using <code>@uploop/timeline</code> · <code>@uploop/compositor</code></div>
+        </div>
+      `,
+      mount(el, ctx) {
+        const canvas = el.querySelector('#viz')
+        const c = canvas.getContext('2d')
+        let video, W, H
+        let fpsCounter = 0, fpsTime = 0, lastFps = 0
+        let offCanvas, offCtx
+
+        function resize() {
+          const rect = canvas.getBoundingClientRect()
+          canvas.width = W = rect.width * devicePixelRatio
+          canvas.height = H = rect.height * devicePixelRatio
+          if (!offCanvas) { offCanvas = document.createElement('canvas'); offCtx = offCanvas.getContext('2d') }
+          offCanvas.width = W; offCanvas.height = H
+        }
+
+        function loadVideo() {
+          video = document.createElement('video')
+          video.crossOrigin = 'anonymous'
+          video.src = BBB_VIDEO
+          video.loop = true
+          video.muted = true
+          video.playsInline = true
+          video.addEventListener('loadedmetadata', () => {
+            resize()
+            el.querySelector('#resVal').textContent = `${video.videoWidth}x${video.videoHeight}`
+            video.play()
+            ctx.send('setPlaying', true)
+            loop()
+          })
+          video.addEventListener('error', () => console.warn('Video load error'))
+        }
+
+        function applyGlitch(srcData, W, H) {
+          const s = ctx.get()
+          const shift = s.rgbShift
+
+          offCtx.clearRect(0, 0, W, H)
+          offCtx.putImageData(srcData, 0, 0)
+
+          if (shift > 0) {
+            // RGB channel shift
+            const img = offCtx.getImageData(0, 0, W, H)
+            const d = img.data
+            const copy = new Uint8ClampedArray(d)
+
+            // Shift red channel right, blue left
+            for (let y = 0; y < H; y++) {
+              // Slice-based shift: some rows get shifted
+              const sliceShift = (y % 8 < 3) ? shift : (y % 13 < 2) ? -shift : 0
+              if (sliceShift === 0) continue
+
+              for (let x = Math.abs(sliceShift); x < W - Math.abs(sliceShift); x++) {
+                const srcIdx = (y * W + x - sliceShift) * 4
+                const dstIdx = (y * W + x) * 4
+                if (sliceShift > 0) {
+                  d[dstIdx] = copy[srcIdx]     // R shifted
+                } else {
+                  d[dstIdx + 2] = copy[srcIdx + 2] // B shifted
+                }
+              }
+              // Random slice colorize
+              if (Math.random() < 0.05) {
+                for (let x = 0; x < W; x++) {
+                  const idx = (y * W + x) * 4
+                  d[idx] = Math.min(255, d[idx] + 30)
+                  d[idx + 1] = Math.min(255, d[idx + 1] + 15)
+                }
+              }
+            }
+            offCtx.putImageData(img, 0, 0)
+          }
+
+          // Scan lines
+          if (s.scanLines > 0) {
+            c.globalAlpha = s.scanLines / 15 * 0.3
+            c.fillStyle = '#000'
+            for (let y = 0; y < H; y += 3) {
+              c.fillRect(0, y, W, 1)
+            }
+            c.globalAlpha = 1
+          }
+
+          // Draw processed frame
+          c.drawImage(offCanvas, 0, 0)
+
+          // Digital noise overlay
+          if (s.noise > 0) {
+            const noiseAlpha = s.noise / 100
+            const imgData = c.getImageData(0, 0, W, H)
+            const px = imgData.data
+            for (let i = 0; i < px.length; i += 4) {
+              if (Math.random() < noiseAlpha * 0.3) {
+                const n = Math.random() * 80 - 40
+                px[i] = Math.min(255, Math.max(0, px[i] + n))
+                px[i + 1] = Math.min(255, Math.max(0, px[i + 1] + n))
+                px[i + 2] = Math.min(255, Math.max(0, px[i + 2] + n))
+              }
+            }
+            c.putImageData(imgData, 0, 0)
+          }
+
+          // Random horizontal slice glitches
+          if (shift > 2 && Math.random() < 0.08) {
+            const sliceY = Math.floor(Math.random() * H * 0.8)
+            const sliceH = 3 + Math.floor(Math.random() * 12)
+            const sliceX = (Math.random() - 0.5) * shift * 4
+            const sliceData = c.getImageData(0, sliceY, W, sliceH)
+            c.fillStyle = '#0a0a0f'
+            c.fillRect(0, sliceY, W, sliceH)
+            c.putImageData(sliceData, sliceX, sliceY)
+          }
+        }
+
+        function render() {
+          if (!video || video.readyState < 2) return
+          c.clearRect(0, 0, W, H)
+
+          // Draw original frame to offscreen
+          offCtx.clearRect(0, 0, W, H)
+          offCtx.drawImage(video, 0, 0, W, H)
+
+          const srcData = offCtx.getImageData(0, 0, W, H)
+          applyGlitch(srcData, W, H)
+
+          // FPS counter
+          fpsCounter++
+          const now = performance.now()
+          if (now - fpsTime >= 1000) {
+            lastFps = Math.round(fpsCounter / ((now - fpsTime) / 1000))
+            fpsCounter = 0; fpsTime = now
+            el.querySelector('#fpsVal').textContent = lastFps
+          }
+        }
+
+        function loop() {
+          if (ctx.get().frozen) {
+            ctx.send('setFps', 0)
+            loop._raf = requestAnimationFrame(loop)
+            return
+          }
+          render()
+          loop._raf = requestAnimationFrame(loop)
+        }
+
+        const origSend = ctx.send
+        ctx.send = function(action, payload) {
+          if (action === 'randomGlitch') {
+            const s = 2 + Math.floor(Math.random() * 20)
+            const sl = 2 + Math.floor(Math.random() * 12)
+            const n = Math.floor(Math.random() * 15)
+            origSend('setRgbShift', s)
+            origSend('setScanLines', sl)
+            origSend('setNoise', n)
+          }
+          if (action === 'togglePlay') {
+            if (video) {
+              if (video.paused) { video.play(); origSend('setPlaying', true) }
+              else { video.pause(); origSend('setPlaying', false) }
+            }
+          }
+          if (action === 'toggleFreeze') {
+            const frozen = !ctx.get().frozen
+            origSend('setPlaying', !frozen)
+            if (!frozen && video.paused) video.play()
+            if (frozen) video.pause()
+          }
+          origSend(action, payload)
+        }
+
+        resize()
+        loadVideo()
+        window.addEventListener('resize', resize)
+        return () => {
+          if (loop._raf) cancelAnimationFrame(loop._raf)
+          if (video) { video.pause(); video.src = '' }
+          window.removeEventListener('resize', resize)
+        }
+      }
+    })
+
+    VideoGlitch.mount(document.getElementById('root'))
+  </script>
+</body>
+</html>

@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Chroma Key — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f; color: #e0e0e0; font-family: system-ui, sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      padding: 60px 24px 40px; gap: 14px;
+    }
+    .back { position: fixed; top: 16px; left: 16px; color: #888; text-decoration: none; font-size: 14px; z-index: 100; }
+    .back:hover { color: #fff; }
+    .title-bar { width: min(1100px, 90vw); display: flex; align-items: center; justify-content: space-between; }
+    .title-bar h1 { font-size: 1.25rem; font-weight: 600; color: #4f8; }
+    .title-bar span { font-size: 12px; color: #666; }
+    .canvas-row {
+      display: flex; gap: 12px; width: min(1100px, 90vw);
+      justify-content: center; flex-wrap: wrap;
+    }
+    canvas {
+      background: #151520; border-radius: 12px; border: 1px solid #252535; display: block;
+      width: 100%; max-width: 540px; height: 340px;
+    }
+    .controls {
+      width: min(1100px, 90vw); background: #151520; border-radius: 10px;
+      padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    }
+    .control-group { display: flex; flex-direction: column; gap: 3px; }
+    .control-group label { font-size: 11px; color: #888; }
+    .control-group .val { font-size: 11px; color: #4f8; font-family: 'Courier New', monospace; }
+    .control-group input[type="range"] { accent-color: #4f8; width: 100px; }
+    .color-picker { display: flex; align-items: center; gap: 6px; }
+    .color-picker input[type="color"] { width: 32px; height: 28px; border: 1px solid #333; border-radius: 4px; background: none; cursor: pointer; }
+    button {
+      background: #1e1e30; color: #e0e0e0; border: 1px solid #333;
+      padding: 8px 16px; border-radius: 8px; cursor: pointer;
+      font-size: 13px; transition: all 0.2s; white-space: nowrap;
+    }
+    button:hover { background: #2a2a40; }
+    button.playing { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    button.mode-active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .info-box {
+      width: min(1100px, 90vw); background: #0f0f1a; border: 1px solid #252535;
+      border-radius: 8px; padding: 10px 18px; font-size: 12px; color: #aaa;
+      display: flex; gap: 24px; flex-wrap: wrap;
+    }
+    .info-box span { color: #f8c040; font-family: 'Courier New', monospace; }
+    .info-box code { color: #4f8; }
+    .canvas-label { text-align: center; font-size: 12px; color: #888; margin-top: 4px; }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+  <div id="root"></div>
+
+  <script type="module">
+    import { html, component } from '@uploop/html'
+    import { easing } from '@uploop/timeline'
+    import { blendModes } from '@uploop/compositor'
+
+    const BBB_VIDEO = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4'
+    const JELLY_VIDEO = 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/360/Jellyfish_360_10s_1MB.mp4'
+
+    const ChromaKey = component('ChromaKey', {
+      state: {
+        playing: false, showBefore: false,
+        keyColor: '#00b140', tolerance: 0.35,
+        feather: 0.05, spillSuppression: 0.5,
+        bgMode: 'gradient', fps: 0,
+      },
+      update: {
+        togglePlay: (s) => ({ ...s, playing: !s.playing }),
+        setPlaying: (s, p) => ({ ...s, playing: p }),
+        toggleBefore: (s) => ({ ...s, showBefore: !s.showBefore }),
+        setKeyColor: (s, v) => ({ ...s, keyColor: v }),
+        setTolerance: (s, v) => ({ ...s, tolerance: v }),
+        setFeather: (s, v) => ({ ...s, feather: v }),
+        setSpill: (s, v) => ({ ...s, spillSuppression: v }),
+        setBgMode: (s, v) => ({ ...s, bgMode: v }),
+        setFps: (s, v) => ({ ...s, fps: v }),
+      },
+      view: (state, { send }) => html`
+        <div class="title-bar">
+          <h1>🟢 Video Chroma Key — Green Screen</h1>
+          <span>Color Picker · Tolerance · Spill Suppression</span>
+        </div>
+        <div class="canvas-row">
+          <div>
+            <span class="canvas-label">${state.showBefore ? 'Original' : 'Chroma Key Output'}</span>
+            <canvas id="canvas1"></canvas>
+          </div>
+        </div>
+        <div class="controls">
+          <button id="playBtn" class="${state.playing ? 'playing' : ''}" onclick=${() => send('togglePlay')}>
+            ${state.playing ? '⏸ Pause' : '▶ Play'}
+          </button>
+          <button class="${state.showBefore ? 'mode-active' : ''}" onclick=${() => send('toggleBefore')}>
+            ${state.showBefore ? '📷 After' : '📷 Before'}
+          </button>
+          <div class="color-picker">
+            <label style="font-size:11px;color:#888;">Key</label>
+            <input type="color" value="${state.keyColor}"
+              oninput=${(e) => send('setKeyColor', e.target.value)} />
+          </div>
+          <div class="control-group">
+            <label>Tolerance <span class="val">${(state.tolerance * 100).toFixed(0)}%</span></label>
+            <input type="range" min="0.05" max="0.8" step="0.01" value="${state.tolerance}"
+              oninput=${(e) => send('setTolerance', Number(e.target.value))} />
+          </div>
+          <div class="control-group">
+            <label>Feather <span class="val">${(state.feather * 100).toFixed(0)}%</span></label>
+            <input type="range" min="0" max="0.2" step="0.005" value="${state.feather}"
+              oninput=${(e) => send('setFeather', Number(e.target.value))} />
+          </div>
+          <div class="control-group">
+            <label>Spill <span class="val">${(state.spillSuppression * 100).toFixed(0)}%</span></label>
+            <input type="range" min="0" max="1" step="0.05" value="${state.spillSuppression}"
+              oninput=${(e) => send('setSpill', Number(e.target.value))} />
+          </div>
+          <div style="display:flex;gap:4px;">
+            ${[{ k: 'gradient', n: 'Gradient' }, { k: 'jellyfish', n: 'Video BG' }, { k: 'checker', n: 'Checker' }].map(bg => html`
+              <button class="${state.bgMode === bg.k ? 'mode-active' : ''}" onclick=${() => send('setBgMode', bg.k)} style="font-size:11px;padding:6px 10px;">${bg.n}</button>
+            `)}
+          </div>
+        </div>
+        <div class="info-box">
+          <div>FPS: <span id="fpsVal">0</span></div>
+          <div>Key: <span id="keyInfo">-</span></div>
+          <div>Using <code>@uploop/timeline</code> · <code>@uploop/compositor</code></div>
+        </div>
+      `,
+      mount(el, ctx) {
+        const canvas = el.querySelector('#canvas1')
+        const c = canvas.getContext('2d')
+        let video, bgVideo, W, H, fpsCounter = 0, fpsTime = 0
+
+        function resize() {
+          const rect = canvas.getBoundingClientRect()
+          canvas.width = W = rect.width * devicePixelRatio
+          canvas.height = H = rect.height * devicePixelRatio
+        }
+
+        function hexToRgb(hex) {
+          const v = parseInt(hex.slice(1), 16)
+          return [(v >> 16) & 255, (v >> 8) & 255, v & 255]
+        }
+
+        function loadVideo() {
+          video = document.createElement('video')
+          video.crossOrigin = 'anonymous'; video.src = BBB_VIDEO
+          video.loop = true; video.muted = true; video.playsInline = true
+          video.addEventListener('loadedmetadata', () => {
+            resize()
+            video.play(); ctx.send('setPlaying', true); loop()
+          })
+
+          bgVideo = document.createElement('video')
+          bgVideo.crossOrigin = 'anonymous'; bgVideo.src = JELLY_VIDEO
+          bgVideo.loop = true; bgVideo.muted = true; bgVideo.playsInline = true
+          bgVideo.play()
+        }
+
+        function drawCheckerBg(c, W, H) {
+          const size = 16
+          for (let y = 0; y < H; y += size) {
+            for (let x = 0; x < W; x += size) {
+              c.fillStyle = ((x / size + y / size) % 2 === 0) ? '#222' : '#1a1a1a'
+              c.fillRect(x, y, size, size)
+            }
+          }
+        }
+
+        function drawGradientBg(c, W, H) {
+          const grad = c.createLinearGradient(0, 0, W, H)
+          grad.addColorStop(0, '#1a1040')
+          grad.addColorStop(0.5, '#0a1a30')
+          grad.addColorStop(1, '#10201a')
+          c.fillStyle = grad
+          c.fillRect(0, 0, W, H)
+        }
+
+        function chromaKeyPixel(srcR, srcG, srcB, keyR, keyG, keyB, tol, feather, spill) {
+          const dr = srcR - keyR, dg = srcG - keyG, db = srcB - keyB
+          const dist = Math.sqrt(dr * dr + dg * dg + db * db) / 441.67 // normalized to ~0-1
+
+          // Soft alpha from tolerance and feather
+          let alpha = 1
+          if (dist < tol) {
+            alpha = 0
+          } else if (dist < tol + feather) {
+            alpha = (dist - tol) / feather
+          }
+
+          // Spill suppression: reduce green in semi-transparent areas
+          let r = srcR, g = srcG, b = srcB
+          if (alpha < 1 && alpha > 0) {
+            // Suppress spill by desaturating green
+            const suppress = spill * (1 - alpha)
+            g = Math.max(0, g - (g - Math.min(r, b)) * suppress)
+          }
+
+          return { r, g, b, a: alpha }
+        }
+
+        function render() {
+          if (!video || video.readyState < 2) return
+          c.clearRect(0, 0, W, H)
+
+          const s = ctx.get()
+          const [kR, kG, kB] = hexToRgb(s.keyColor)
+
+          // Draw background
+          if (s.bgMode === 'jellyfish' && bgVideo && bgVideo.readyState >= 2) {
+            c.drawImage(bgVideo, 0, 0, W, H)
+          } else if (s.bgMode === 'checker') {
+            drawCheckerBg(c, W, H)
+          } else {
+            drawGradientBg(c, W, H)
+          }
+
+          if (s.showBefore) {
+            c.globalAlpha = 1
+            c.drawImage(video, 0, 0, W, H)
+            c.globalAlpha = 1
+          } else {
+            // Process chroma key
+            const offCanvas = document.createElement('canvas')
+            offCanvas.width = W; offCanvas.height = H
+            const offCtx = offCanvas.getContext('2d')
+            offCtx.drawImage(video, 0, 0, W, H)
+            const imgData = offCtx.getImageData(0, 0, W, H)
+            const px = imgData.data
+
+            // Get background pixels for compositing
+            const bgData = c.getImageData(0, 0, W, H).data
+
+            for (let i = 0; i < px.length; i += 4) {
+              const result = chromaKeyPixel(
+                px[i], px[i + 1], px[i + 2],
+                kR, kG, kB,
+                s.tolerance, s.feather, s.spillSuppression
+              )
+
+              if (result.a === 0) {
+                // Fully transparent — keep background
+                px[i] = bgData[i]; px[i + 1] = bgData[i + 1]; px[i + 2] = bgData[i + 2]
+              } else if (result.a < 1) {
+                // Blend with background
+                const invA = 1 - result.a
+                px[i] = result.r * result.a + bgData[i] * invA
+                px[i + 1] = result.g * result.a + bgData[i + 1] * invA
+                px[i + 2] = result.b * result.a + bgData[i + 2] * invA
+              } else {
+                px[i] = result.r; px[i + 1] = result.g; px[i + 2] = result.b
+              }
+            }
+
+            c.putImageData(imgData, 0, 0)
+          }
+
+          el.querySelector('#keyInfo').textContent = `RGB(${kR},${kG},${kB})`
+
+          fpsCounter++
+          const now = performance.now()
+          if (now - fpsTime >= 1000) {
+            el.querySelector('#fpsVal').textContent = Math.round(fpsCounter / ((now - fpsTime) / 1000))
+            fpsCounter = 0; fpsTime = now
+          }
+        }
+
+        function loop() {
+          render()
+          loop._raf = requestAnimationFrame(loop)
+        }
+
+        const origSend = ctx.send
+        ctx.send = function(action, payload) {
+          if (action === 'togglePlay') {
+            if (video) { video.paused ? video.play() : video.pause(); origSend('setPlaying', !video.paused) }
+          }
+          origSend(action, payload)
+        }
+
+        resize(); loadVideo()
+        window.addEventListener('resize', resize)
+        return () => {
+          if (loop._raf) cancelAnimationFrame(loop._raf)
+          if (video) { video.pause(); video.src = '' }
+          if (bgVideo) { bgVideo.pause(); bgVideo.src = '' }
+          window.removeEventListener('resize', resize)
+        }
+      }
+    })
+
+    ChromaKey.mount(document.getElementById('root'))
+  </script>
+</body>
+</html>

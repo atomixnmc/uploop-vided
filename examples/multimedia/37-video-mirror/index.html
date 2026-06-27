@@ -1,0 +1,302 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Mirror — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f; color: #e0e0e0; font-family: system-ui, sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
+      padding: 60px 24px 40px; gap: 14px;
+    }
+    .back { position: fixed; top: 16px; left: 16px; color: #888; text-decoration: none; font-size: 14px; z-index: 100; }
+    .back:hover { color: #fff; }
+    .title-bar { width: min(900px, 90vw); display: flex; align-items: center; justify-content: space-between; }
+    .title-bar h1 { font-size: 1.25rem; font-weight: 600; color: #4f8; }
+    .title-bar span { font-size: 12px; color: #666; }
+    canvas {
+      width: min(900px, 90vw); height: min(900px, 90vw);
+      background: #151520; border-radius: 12px; border: 1px solid #252535; display: block;
+    }
+    .controls {
+      width: min(900px, 90vw); background: #151520; border-radius: 10px;
+      padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+    }
+    .control-group { display: flex; flex-direction: column; gap: 3px; }
+    .control-group label { font-size: 11px; color: #888; }
+    .control-group .val { font-size: 11px; color: #4f8; font-family: 'Courier New', monospace; }
+    .control-group input[type="range"] { accent-color: #4f8; width: 100px; }
+    button {
+      background: #1e1e30; color: #e0e0e0; border: 1px solid #333;
+      padding: 8px 16px; border-radius: 8px; cursor: pointer;
+      font-size: 13px; transition: all 0.2s; white-space: nowrap;
+    }
+    button:hover { background: #2a2a40; }
+    button.playing { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    button.mode-active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .mode-btns { display: flex; gap: 4px; }
+    .mode-btns button { padding: 6px 12px; font-size: 11px; }
+    .info-box {
+      width: min(900px, 90vw); background: #0f0f1a; border: 1px solid #252535;
+      border-radius: 8px; padding: 10px 18px; font-size: 12px; color: #aaa;
+      display: flex; gap: 24px; flex-wrap: wrap;
+    }
+    .info-box span { color: #f8c040; font-family: 'Courier New', monospace; }
+    .info-box code { color: #4f8; }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+  <div id="root"></div>
+
+  <script type="module">
+    import { html, component } from '@uploop/html'
+    import { easing } from '@uploop/timeline'
+    import { blendModes } from '@uploop/compositor'
+
+    const BBB_VIDEO = 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4'
+
+    const VideoMirror = component('VideoMirror', {
+      state: {
+        playing: false, mode: 'kaleidoscope',
+        segments: 6, rotation: 0, fps: 0,
+      },
+      update: {
+        togglePlay: (s) => ({ ...s, playing: !s.playing }),
+        setPlaying: (s, p) => ({ ...s, playing: p }),
+        setMode: (s, m) => ({ ...s, mode: m }),
+        setSegments: (s, v) => ({ ...s, segments: v }),
+        setRotation: (s, v) => ({ ...s, rotation: v }),
+        setFps: (s, v) => ({ ...s, fps: v }),
+      },
+      view: (state, { send }) => html`
+        <div class="title-bar">
+          <h1>🪞 Video Mirror — Kaleidoscope Effect</h1>
+          <span>Mirror Modes · Segments · Rotation</span>
+        </div>
+        <canvas id="viz"></canvas>
+        <div class="controls">
+          <button id="playBtn" class="${state.playing ? 'playing' : ''}" onclick=${() => send('togglePlay')}>
+            ${state.playing ? '⏸ Pause' : '▶ Play'}
+          </button>
+          <div class="mode-btns">
+            ${[{ k: 'horizontal', n: '↔ Horiz' }, { k: 'vertical', n: '↕ Vert' },
+               { k: 'quad', n: '⊞ Quad' }, { k: 'kaleidoscope', n: '✦ Kaleido' }].map(m => html`
+              <button class="${state.mode === m.k ? 'mode-active' : ''}" onclick=${() => send('setMode', m.k)}>${m.n}</button>
+            `)}
+          </div>
+          <div class="control-group">
+            <label>Segments <span class="val">${state.segments}</span></label>
+            <input type="range" min="2" max="16" step="1" value="${state.segments}"
+              oninput=${(e) => send('setSegments', Number(e.target.value))} />
+          </div>
+          <div class="control-group">
+            <label>Rotation <span class="val">${state.rotation}°</span></label>
+            <input type="range" min="0" max="360" step="1" value="${state.rotation}"
+              oninput=${(e) => send('setRotation', Number(e.target.value))} />
+          </div>
+        </div>
+        <div class="info-box">
+          <div>FPS: <span id="fpsVal">0</span></div>
+          <div>Mode: <span id="modeInfo">kaleidoscope</span></div>
+          <div>Using <code>@uploop/timeline</code> · <code>@uploop/compositor</code></div>
+        </div>
+      `,
+      mount(el, ctx) {
+        const canvas = el.querySelector('#viz')
+        const c = canvas.getContext('2d')
+        let video, W, H, fpsCounter = 0, fpsTime = 0, offCanvas, offCtx
+
+        function resize() {
+          const rect = canvas.getBoundingClientRect()
+          canvas.width = W = rect.width * devicePixelRatio
+          canvas.height = H = rect.height * devicePixelRatio
+          offCanvas = document.createElement('canvas')
+          offCanvas.width = W; offCanvas.height = H
+          offCtx = offCanvas.getContext('2d')
+        }
+
+        function loadVideo() {
+          video = document.createElement('video')
+          video.crossOrigin = 'anonymous'; video.src = BBB_VIDEO
+          video.loop = true; video.muted = true; video.playsInline = true
+          video.addEventListener('loadedmetadata', () => {
+            resize()
+            video.play(); ctx.send('setPlaying', true); loop()
+          })
+        }
+
+        function drawKaleidoscope() {
+          const s = ctx.get()
+          const cx = W / 2, cy = H / 2
+          const segments = s.mode === 'kaleidoscope' ? s.segments : (
+            s.mode === 'quad' ? 4 : 2
+          )
+
+          const sourceW = video.videoWidth, sourceH = video.videoHeight
+          const srcAspect = sourceW / sourceH
+          const dstAspect = W / H
+
+          let sw, sh, sx, sy
+          if (srcAspect > dstAspect) {
+            sw = sourceH * dstAspect; sh = sourceH
+            sx = (sourceW - sw) / 2; sy = 0
+          } else {
+            sw = sourceW; sh = sourceW / dstAspect
+            sx = 0; sy = (sourceH - sh) / 2
+          }
+
+          // Draw to offscreen at half size for performance
+          const halfW = W / 2, halfH = H / 2
+          offCtx.clearRect(0, 0, W, H)
+
+          // Draw one wedge
+          const sliceAngle = (Math.PI * 2) / segments
+          const rotRad = s.rotation * Math.PI / 180
+
+          offCtx.save()
+          offCtx.translate(cx, cy)
+          offCtx.rotate(rotRad)
+
+          // Create a wedge-shaped clip
+          offCtx.beginPath()
+          offCtx.moveTo(0, 0)
+          offCtx.arc(0, 0, Math.max(W, H), -sliceAngle / 2, sliceAngle / 2)
+          offCtx.closePath()
+          offCtx.clip()
+
+          // Draw source video scaled into wedge area (from center outward)
+          offCtx.drawImage(video, sx, sy, sw, sh, -W * 0.7, -H * 0.7, W * 1.4, H * 1.4)
+          offCtx.restore()
+
+          // Now mirror the wedge across all segments
+          c.clearRect(0, 0, W, H)
+          c.save()
+          c.translate(cx, cy)
+
+          for (let i = 0; i < segments; i++) {
+            c.save()
+            c.rotate(i * sliceAngle)
+            if (i % 2 === 1) c.scale(-1, 1) // Mirror every other segment
+            c.drawImage(offCanvas, -cx, -cy)
+            c.restore()
+          }
+
+          c.restore()
+
+          // Center overlay
+          const centerGrad = c.createRadialGradient(cx, cy, 0, cx, cy, 30)
+          centerGrad.addColorStop(0, 'rgba(10,10,20,0.8)')
+          centerGrad.addColorStop(1, 'rgba(0,0,0,0)')
+          c.fillStyle = centerGrad
+          c.beginPath(); c.arc(cx, cy, 30, 0, Math.PI * 2); c.fill()
+
+          // Ring boundary
+          c.strokeStyle = 'rgba(79,255,136,0.2)'
+          c.lineWidth = 2
+          c.beginPath(); c.arc(cx, cy, Math.min(W, H) * 0.48, 0, Math.PI * 2); c.stroke()
+        }
+
+        function drawMirror() {
+          const s = ctx.get()
+          const cx = W / 2, cy = H / 2
+          c.clearRect(0, 0, W, H)
+
+          const sourceW = video.videoWidth, sourceH = video.videoHeight
+          const srcAspect = sourceW / sourceH
+          const dstAspect = W / H
+          let vw, vh, vx, vy
+          if (srcAspect > dstAspect) {
+            vw = W; vh = W / srcAspect; vx = 0; vy = (H - vh) / 2
+          } else {
+            vh = H; vw = H * srcAspect; vy = 0; vx = (W - vw) / 2
+          }
+
+          if (s.mode === 'horizontal') {
+            // Top: original, Bottom: mirrored
+            const hw = W, hh = H / 2
+            c.save()
+            c.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, vx, vy, vw, vh)
+            c.save()
+            c.translate(0, H)
+            c.scale(1, -1)
+            c.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, vx, vy, vw, vh)
+            c.restore()
+            // Dividing line
+            c.strokeStyle = '#4f8'; c.lineWidth = 1
+            c.beginPath(); c.moveTo(0, H / 2); c.lineTo(W, H / 2); c.stroke()
+          } else if (s.mode === 'vertical') {
+            c.save()
+            c.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, vx, vy, vw, vh)
+            c.save()
+            c.translate(W, 0)
+            c.scale(-1, 1)
+            c.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, vx, vy, vw, vh)
+            c.restore()
+            c.strokeStyle = '#4f8'; c.lineWidth = 1
+            c.beginPath(); c.moveTo(W / 2, 0); c.lineTo(W / 2, H); c.stroke()
+          } else if (s.mode === 'quad') {
+            const hw = W / 2, hh = H / 2
+            // Top-left
+            c.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, vx, vy, vw, vh)
+            // Top-right (flip X)
+            c.save(); c.translate(W, 0); c.scale(-1, 1)
+            c.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, vx, vy, vw, vh); c.restore()
+            // Bottom-left (flip Y)
+            c.save(); c.translate(0, H); c.scale(1, -1)
+            c.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, vx, vy, vw, vh); c.restore()
+            // Bottom-right (flip both)
+            c.save(); c.translate(W, H); c.scale(-1, -1)
+            c.drawImage(video, 0, 0, video.videoWidth, video.videoHeight, vx, vy, vw, vh); c.restore()
+            // Crosshairs
+            c.strokeStyle = '#4f8'; c.lineWidth = 1
+            c.beginPath(); c.moveTo(W / 2, 0); c.lineTo(W / 2, H); c.stroke()
+            c.beginPath(); c.moveTo(0, H / 2); c.lineTo(W, H / 2); c.stroke()
+          } else {
+            drawKaleidoscope()
+          }
+        }
+
+        function render() {
+          if (!video || video.readyState < 2) return
+          drawMirror()
+
+          el.querySelector('#modeInfo').textContent = ctx.get().mode
+
+          fpsCounter++
+          const now = performance.now()
+          if (now - fpsTime >= 1000) {
+            el.querySelector('#fpsVal').textContent = Math.round(fpsCounter / ((now - fpsTime) / 1000))
+            fpsCounter = 0; fpsTime = now
+          }
+        }
+
+        function loop() {
+          render()
+          loop._raf = requestAnimationFrame(loop)
+        }
+
+        const origSend = ctx.send
+        ctx.send = function(action, payload) {
+          if (action === 'togglePlay') {
+            if (video) { video.paused ? video.play() : video.pause(); origSend('setPlaying', !video.paused) }
+          }
+          origSend(action, payload)
+        }
+
+        resize(); loadVideo()
+        window.addEventListener('resize', resize)
+        return () => {
+          if (loop._raf) cancelAnimationFrame(loop._raf)
+          if (video) { video.pause(); video.src = '' }
+          window.removeEventListener('resize', resize)
+        }
+      }
+    })
+
+    VideoMirror.mount(document.getElementById('root'))
+  </script>
+</body>
+</html>
