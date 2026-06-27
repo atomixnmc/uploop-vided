@@ -132,9 +132,9 @@
     </head>
     <body>
         <h1>46 · Scrolling Marquee / Ticker</h1>
-        <div class="marquee-stage" id="stage">
-            <div class="marquee-bar" id="bar">
-                <div class="marquee-ticker" id="ticker"></div>
+        <div class="marquee-stage" data-ref="stage">
+            <div class="marquee-bar" data-ref="bar">
+                <div class="marquee-ticker" data-ref="ticker"></div>
             </div>
         </div>
         <div class="controls" id="controls"></div>
@@ -198,7 +198,7 @@
                             class="marquee-stage${state.vertical
                                 ? " vertical"
                                 : ""}"
-                            id="stage"
+                            data-ref="stage"
                             style="background:${style.barBg};${state.vertical
                                 ? "height:280px;"
                                 : ""}"
@@ -207,11 +207,11 @@
                                 class="marquee-bar${state.vertical
                                     ? " vertical"
                                     : ""}"
-                                id="bar"
+                                data-ref="bar"
                             >
                                 <div
                                     class="marquee-ticker"
-                                    id="ticker"
+                                    data-ref="ticker"
                                     style="
                 font-family:${style.font}; font-size:${state.fontSize}px;
                 color:${state.textColor}; white-space:${state.vertical
@@ -295,8 +295,8 @@
                     `;
                 },
                 mount(el, ctx) {
-                    const ticker = el.querySelector("#ticker");
-                    const bar = el.querySelector("#bar");
+                    const ticker = el.querySelector('[data-ref="ticker"]');
+                    const bar = el.querySelector('[data-ref="bar"]');
                     let offset = 0;
                     let last = 0;
                     let raf;
@@ -323,7 +323,7 @@
                     }
                     raf = requestAnimationFrame(loop);
                     // Pause on hover
-                    const stage = el.querySelector("#stage");
+                    const stage = el.querySelector('.stage');
                     let hovered = false;
                     const onEnter = () => {
                         hovered = true;

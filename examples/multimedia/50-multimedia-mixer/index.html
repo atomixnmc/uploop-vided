@@ -150,10 +150,10 @@
         <h1>50 · Full Multimedia Mixer</h1>
         <div class="mixer-layout" id="layout">
             <div class="panel video-panel">
-                <video id="video" muted loop playsinline></video>
+                <video data-ref="video" muted loop playsinline></video>
             </div>
             <div class="panel viz-panel">
-                <canvas id="viz-canvas" width="400" height="225"></canvas>
+                <canvas data-ref="viz-canvas" width="400" height="225"></canvas>
             </div>
             <div
                 class="panel text-panel"
@@ -343,11 +343,11 @@
                     <h1>50 · Full Multimedia Mixer</h1>
                     <div class="mixer-layout">
                         <div class="panel video-panel">
-                            <video id="video" muted loop playsinline></video>
+                            <video data-ref="video" muted loop playsinline></video>
                         </div>
                         <div class="panel viz-panel">
                             <canvas
-                                id="viz-canvas"
+                                data-ref="viz-canvas"
                                 width="400"
                                 height="225"
                             ></canvas>
@@ -442,8 +442,8 @@
                     </div>
                 `,
                 mount(el, ctx) {
-                    const video = el.querySelector("#video");
-                    const vizCanvas = el.querySelector("#viz-canvas");
+                    const video = el.querySelector('video');
+                    const vizCanvas = el.querySelector('canvas');
                     const vizCtx = vizCanvas.getContext("2d");
 
                     // Video: generated canvas stream

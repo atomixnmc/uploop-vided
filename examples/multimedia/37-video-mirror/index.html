@@ -167,12 +167,12 @@
                         <h1>🪞 Video Mirror — Kaleidoscope Effect</h1>
                         <span>Mirror Modes · Segments · Rotation</span>
                     </div>
-                    <canvas id="viz"></canvas>
+                    <canvas data-ref="viz"></canvas>
                     <div class="controls">
                         <button
                             id="playBtn"
                             class="${state.playing ? "playing" : ""}"
-                            onclick=${() => send("togglePlay")}
+                            @click=${() => send("togglePlay")}
                         >
                             ${state.playing ? "⏸ Pause" : "▶ Play"}
                         </button>
@@ -188,7 +188,7 @@
                                         class="${state.mode === m.k
                                             ? "mode-active"
                                             : ""}"
-                                        onclick=${() => send("setMode", m.k)}
+                                        @click=${() => send("setMode", m.k)}
                                     >
                                         ${m.n}
                                     </button>
@@ -208,7 +208,7 @@
                                 max="16"
                                 step="1"
                                 value="${state.segments}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send("setSegments", Number(e.target.value))}
                             />
                         </div>
@@ -225,14 +225,14 @@
                                 max="360"
                                 step="1"
                                 value="${state.rotation}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send("setRotation", Number(e.target.value))}
                             />
                         </div>
                     </div>
                     <div class="info-box">
-                        <div>FPS: <span id="fpsVal">0</span></div>
-                        <div>Mode: <span id="modeInfo">kaleidoscope</span></div>
+                        <div>FPS: <span data-ref="fpsVal">0</span></div>
+                        <div>Mode: <span data-ref="modeInfo">kaleidoscope</span></div>
                         <div>
                             📡 Self-generated video — no external URLs needed
                         </div>
@@ -243,7 +243,7 @@
                     </div>
                 `,
                 mount(el, ctx) {
-                    const canvas = el.querySelector("#viz");
+                    const canvas = el.querySelector('canvas');
                     const c = canvas.getContext("2d");
                     let video,
                         W,
@@ -614,13 +614,13 @@
                         if (!video || video.readyState < 2) return;
                         drawMirror();
 
-                        el.querySelector("#modeInfo").textContent =
+                        el.querySelector('[data-ref="modeInfo"]').textContent =
                             ctx.get().mode;
 
                         fpsCounter++;
                         const now = performance.now();
                         if (now - fpsTime >= 1000) {
-                            el.querySelector("#fpsVal").textContent =
+                            el.querySelector('[data-ref="fpsVal"]').textContent =
                                 Math.round(
                                     fpsCounter / ((now - fpsTime) / 1000),
                                 );

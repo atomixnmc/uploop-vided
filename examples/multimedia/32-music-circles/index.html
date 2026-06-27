@@ -142,7 +142,7 @@
                     bassEnergy: 0,
                     rotation: 0,
                     rayCount: 96,
-                    uploadLabel: "Self-oscillating",
+                    uploadLabel: "Pentatonic Arp",
                 },
                 update: {
                     togglePlay: (s) => ({ ...s, playing: !s.playing }),
@@ -157,12 +157,12 @@
                         <h1>🔵 Music Circles — Circular Spectrum</h1>
                         <span>Radial FFT · Bass-Reactive Pulse</span>
                     </div>
-                    <canvas id="viz"></canvas>
+                    <canvas data-ref="viz"></canvas>
                     <div class="controls">
                         <button
                             id="playBtn"
                             class="${state.playing ? "playing" : ""}"
-                            onclick=${() => send("togglePlay")}
+                            @click=${() => send("togglePlay")}
                         >
                             ${state.playing ? "⏸ Pause" : "▶ Play"}
                         </button>
@@ -180,7 +180,7 @@
                                 max="1"
                                 step="0.05"
                                 value="${state.volume}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send("setVolume", Number(e.target.value))}
                             />
                         </div>
@@ -195,7 +195,7 @@
                             id="fileUpload"
                             accept="audio/*"
                             style="display:none"
-                            onchange=${(e) => {
+                            @change=${(e) => {
                                 const f = e.target.files?.[0];
                                 if (f) {
                                     send("setLabel", f.name);
@@ -205,8 +205,8 @@
                         />
                     </div>
                     <div class="info-box">
-                        <div>Bass Energy: <span id="bassInfo">0.00</span></div>
-                        <div>Rotation: <span id="rotInfo">0.0°</span></div>
+                        <div>Bass Energy: <span data-ref="bassInfo">0.00</span></div>
+                        <div>Rotation: <span data-ref="rotInfo">0.0°</span></div>
                         <div>
                             Using <code>@uploop/timeline</code> ·
                             <code>@uploop/compositor</code>
@@ -214,7 +214,7 @@
                     </div>
                 `,
                 mount(el, ctx) {
-                    const canvas = el.querySelector("#viz");
+                    const canvas = el.querySelector('canvas');
                     const c = canvas.getContext("2d");
                     let audioCtx,
                         analyser,
@@ -233,25 +233,92 @@
                         canvas.height = rect.height * devicePixelRatio;
                     }
 
-                    function createOscillator(audioCtx, dest) {
-                        const osc = audioCtx.createOscillator();
-                        const mod = audioCtx.createOscillator();
-                        const modGain = audioCtx.createGain();
+                    function createMusicGenerator(audioCtx, analyser) {
+                        const notes = [
+                            220, 261.63, 293.66, 329.63, 392, 440, 523.25,
+                            587.33, 659.25, 784,
+                        ];
 
-                        osc.type = "sawtooth";
-                        osc.frequency.value = 55;
+                        // Pad oscillator — soft triangle wave with slow LFO
+                        const padOsc = audioCtx.createOscillator();
+                        padOsc.type = "triangle";
+                        padOsc.frequency.value = 220;
 
-                        mod.type = "sine";
-                        mod.frequency.value = 110;
-                        modGain.gain.value = 200;
+                        const padLFO = audioCtx.createOscillator();
+                        padLFO.type = "sine";
+                        padLFO.frequency.value = 0.3;
+                        const padLFOGain = audioCtx.createGain();
+                        padLFOGain.gain.value = 15;
+                        padLFO.connect(padLFOGain);
+                        padLFOGain.connect(padOsc.frequency);
 
-                        mod.connect(modGain);
-                        modGain.connect(osc.frequency);
-                        osc.connect(dest);
+                        const padFilter = audioCtx.createBiquadFilter();
+                        padFilter.type = "lowpass";
+                        padFilter.frequency.value = 800;
+                        padFilter.Q.value = 1;
 
-                        osc.start();
-                        mod.start();
-                        return { osc, mod, modGain };
+                        padOsc.connect(padFilter);
+
+                        const padGain = audioCtx.createGain();
+                        padGain.gain.value = 0.15;
+                        padFilter.connect(padGain);
+                        padGain.connect(analyser);
+
+                        padOsc.start();
+                        padLFO.start();
+
+                        // Arpeggio — cycling through pentatonic notes
+                        const arpOsc = audioCtx.createOscillator();
+                        arpOsc.type = "sine";
+                        arpOsc.frequency.value = 440;
+
+                        const arpGain = audioCtx.createGain();
+                        arpGain.gain.value = 0.1;
+                        arpOsc.connect(arpGain);
+                        arpGain.connect(analyser);
+
+                        arpOsc.start();
+
+                        // Arpeggio sequencer
+                        let noteIndex = 0;
+                        let beatCount = 0;
+                        const arpInterval = setInterval(() => {
+                            const now = audioCtx.currentTime;
+                            arpOsc.frequency.setTargetAtTime(
+                                notes[noteIndex],
+                                now,
+                                0.02,
+                            );
+                            arpGain.gain.setTargetAtTime(0.12, now, 0.01);
+                            setTimeout(() => {
+                                arpGain.gain.setTargetAtTime(
+                                    0.02,
+                                    audioCtx.currentTime,
+                                    0.05,
+                                );
+                            }, 120);
+
+                            noteIndex = (noteIndex + 1) % notes.length;
+                            beatCount++;
+                            if (beatCount % 8 === 0) {
+                                const rootNote =
+                                    notes[Math.floor(Math.random() * 5)];
+                                padOsc.frequency.setTargetAtTime(
+                                    rootNote,
+                                    audioCtx.currentTime,
+                                    0.5,
+                                );
+                            }
+                        }, 180);
+
+                        return {
+                            nodes: [padOsc, padLFO, arpOsc],
+                            gains: [padGain, arpGain, padLFOGain],
+                            filters: [padFilter],
+                            stop() {
+                                clearInterval(arpInterval);
+                            },
+                        };
                     }
 
                     function initAudio() {
@@ -266,7 +333,7 @@
                         gainNode = audioCtx.createGain();
                         gainNode.gain.value = ctx.get().volume;
 
-                        oscNodes = createOscillator(audioCtx, analyser);
+                        oscNodes = createMusicGenerator(audioCtx, analyser);
                         analyser.connect(gainNode);
                         gainNode.connect(audioCtx.destination);
 
@@ -307,8 +374,7 @@
                         if (loop._raf) cancelAnimationFrame(loop._raf);
                         if (oscNodes) {
                             try {
-                                oscNodes.osc.stop();
-                                oscNodes.mod.stop();
+                                oscNodes.stop();
                             } catch (_) {}
                             oscNodes = null;
                         }
@@ -499,9 +565,9 @@
                             c.fillText(lbl, lx - 10, ly + 4);
                         }
 
-                        el.querySelector("#bassInfo").textContent =
+                        el.querySelector('[data-ref="bassInfo"]').textContent =
                             bassEnergy.toFixed(3);
-                        el.querySelector("#rotInfo").textContent = (
+                        el.querySelector('[data-ref="rotInfo"]').textContent = (
                             ((rotation * 180) / Math.PI) %
                             360
                         ).toFixed(1);

@@ -106,7 +106,7 @@
         <a href="../.." class="back">← Examples</a>
         <h1>47 · Slow Motion / Speed Ramp</h1>
         <div class="stage">
-            <video id="video" muted loop playsinline></video>
+            <video data-ref="video" muted loop playsinline></video>
         </div>
         <div class="speed-display" id="speed-label">1.00×</div>
         <div class="controls" id="controls"></div>
@@ -174,7 +174,7 @@
                     <a href="../.." class="back">← Examples</a>
                     <h1>47 · Slow Motion / Speed Ramp</h1>
                     <div class="stage">
-                        <video id="video" muted loop playsinline></video>
+                        <video data-ref="video" muted loop playsinline></video>
                     </div>
                     <div class="speed-display">${state.speed.toFixed(2)}×</div>
                     <div class="controls">
@@ -218,7 +218,7 @@
                     </div>
                 `,
                 mount(el, ctx) {
-                    const video = el.querySelector("#video");
+                    const video = el.querySelector('video');
                     const { stream, stop: stopStream } = createVideoStream();
                     video.srcObject = stream;
                     video.play().then(() => ctx.send("togglePlay"));

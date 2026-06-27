@@ -167,16 +167,16 @@
                         <h1>👣 Video Trails — Motion Echo Effect</h1>
                         <span>Frame Buffer · Blend Modes · Decay</span>
                     </div>
-                    <canvas id="viz"></canvas>
+                    <canvas data-ref="viz"></canvas>
                     <div class="controls">
                         <button
                             id="playBtn"
                             class="${state.playing ? "playing" : ""}"
-                            onclick=${() => send("togglePlay")}
+                            @click=${() => send("togglePlay")}
                         >
                             ${state.playing ? "⏸ Pause" : "▶ Play"}
                         </button>
-                        <button onclick=${() => send("clearTrails")}>
+                        <button @click=${() => send("clearTrails")}>
                             🗑 Clear
                         </button>
                         <div class="control-group">
@@ -192,7 +192,7 @@
                                 max="30"
                                 step="1"
                                 value="${state.trailLength}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send(
                                         "setTrailLength",
                                         Number(e.target.value),
@@ -212,7 +212,7 @@
                                 max="0.99"
                                 step="0.01"
                                 value="${state.decay}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send("setDecay", Number(e.target.value))}
                             />
                         </div>
@@ -227,7 +227,7 @@
                                         class="${state.blendMode === bm.k
                                             ? "mode-active"
                                             : ""}"
-                                        onclick=${() =>
+                                        @click=${() =>
                                             send("setBlendMode", bm.k)}
                                     >
                                         ${bm.n}
@@ -237,8 +237,8 @@
                         </div>
                     </div>
                     <div class="info-box">
-                        <div>FPS: <span id="fpsVal">0</span></div>
-                        <div>Buffer: <span id="bufInfo">0 frames</span></div>
+                        <div>FPS: <span data-ref="fpsVal">0</span></div>
+                        <div>Buffer: <span data-ref="bufInfo">0 frames</span></div>
                         <div>
                             📡 Self-generated video — no external URLs needed
                         </div>
@@ -249,7 +249,7 @@
                     </div>
                 `,
                 mount(el, ctx) {
-                    const canvas = el.querySelector("#viz");
+                    const canvas = el.querySelector('canvas');
                     const c = canvas.getContext("2d");
                     let video,
                         W,
@@ -382,13 +382,13 @@
                         c.fillStyle = vignette;
                         c.fillRect(0, 0, W, H);
 
-                        el.querySelector("#bufInfo").textContent =
+                        el.querySelector('[data-ref="bufInfo"]').textContent =
                             `${frameBuffer.length} frames`;
 
                         fpsCounter++;
                         const now = performance.now();
                         if (now - fpsTime >= 1000) {
-                            el.querySelector("#fpsVal").textContent =
+                            el.querySelector('[data-ref="fpsVal"]').textContent =
                                 Math.round(
                                     fpsCounter / ((now - fpsTime) / 1000),
                                 );
@@ -412,7 +412,7 @@
                         }
                         if (action === "clearTrails") {
                             frameBuffer = [];
-                            el.querySelector("#bufInfo").textContent =
+                            el.querySelector('[data-ref="bufInfo"]').textContent =
                                 "0 frames";
                         }
                         origSend(action, payload);

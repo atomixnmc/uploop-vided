@@ -202,18 +202,18 @@
                     <div class="canvas-row">
                         <div>
                             <span class="canvas-label">Original</span
-                            ><canvas id="canvasOrig"></canvas>
+                            ><canvas data-ref="canvasOrig"></canvas>
                         </div>
                         <div>
                             <span class="canvas-label">Edge Detection</span
-                            ><canvas id="canvasEdge"></canvas>
+                            ><canvas data-ref="canvasEdge"></canvas>
                         </div>
                     </div>
                     <div class="controls">
                         <button
                             id="playBtn"
                             class="${state.playing ? "playing" : ""}"
-                            onclick=${() => send("togglePlay")}
+                            @click=${() => send("togglePlay")}
                         >
                             ${state.playing ? "⏸ Pause" : "▶ Play"}
                         </button>
@@ -228,7 +228,7 @@
                                         class="${state.algorithm === a.k
                                             ? "mode-active"
                                             : ""}"
-                                        onclick=${() => send("setAlgo", a.k)}
+                                        @click=${() => send("setAlgo", a.k)}
                                     >
                                         ${a.n}
                                     </button>
@@ -250,7 +250,7 @@
                                 max="0.5"
                                 step="0.01"
                                 value="${state.threshold}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send(
                                         "setThreshold",
                                         Number(e.target.value),
@@ -259,7 +259,7 @@
                         </div>
                         <button
                             class="${state.invert ? "mode-active" : ""}"
-                            onclick=${() => send("toggleInvert")}
+                            @click=${() => send("toggleInvert")}
                         >
                             ${state.invert ? "◑ Inverted" : "◐ Normal"}
                         </button>
@@ -270,7 +270,7 @@
                             <input
                                 type="color"
                                 value="${state.edgeColor}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send("setEdgeColor", e.target.value)}
                             />
                         </div>
@@ -289,7 +289,7 @@
                                 max="1"
                                 step="0.05"
                                 value="${state.overlayOpacity}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send(
                                         "setOverlayOpacity",
                                         Number(e.target.value),
@@ -298,8 +298,8 @@
                         </div>
                     </div>
                     <div class="info-box">
-                        <div>FPS: <span id="fpsVal">0</span></div>
-                        <div>Algorithm: <span id="algoInfo">sobel</span></div>
+                        <div>FPS: <span data-ref="fpsVal">0</span></div>
+                        <div>Algorithm: <span data-ref="algoInfo">sobel</span></div>
                         <div>
                             📡 Self-generated video — no external URLs needed
                         </div>
@@ -310,8 +310,8 @@
                     </div>
                 `,
                 mount(el, ctx) {
-                    const origCanvas = el.querySelector("#canvasOrig");
-                    const edgeCanvas = el.querySelector("#canvasEdge");
+                    const origCanvas = el.querySelector('[data-ref="canvasOrig"]');
+                    const edgeCanvas = el.querySelector('[data-ref="canvasEdge"]');
                     const origCtx = origCanvas.getContext("2d");
                     const edgeCtx = edgeCanvas.getContext("2d");
                     let video,
@@ -649,12 +649,12 @@
                         edgeCtx.putImageData(edgeData, 0, 0);
                         edgeCtx.globalAlpha = 1;
 
-                        el.querySelector("#algoInfo").textContent = s.algorithm;
+                        el.querySelector('[data-ref="algoInfo"]').textContent = s.algorithm;
 
                         fpsCounter++;
                         const now = performance.now();
                         if (now - fpsTime >= 1000) {
-                            el.querySelector("#fpsVal").textContent =
+                            el.querySelector('[data-ref="fpsVal"]').textContent =
                                 Math.round(
                                     fpsCounter / ((now - fpsTime) / 1000),
                                 );

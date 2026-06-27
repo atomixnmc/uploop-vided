@@ -161,23 +161,23 @@
                         <h1>📺 Video Glitch — Distortion Effects</h1>
                         <span>RGB Shift · Scan Lines · Digital Noise</span>
                     </div>
-                    <canvas id="viz"></canvas>
+                    <canvas data-ref="viz"></canvas>
                     <div class="controls">
                         <button
                             id="playBtn"
                             class="${state.playing ? "playing" : ""}"
-                            onclick=${() => send("togglePlay")}
+                            @click=${() => send("togglePlay")}
                         >
                             ${state.playing ? "⏸ Pause" : "▶ Play"}
                         </button>
                         <button
                             id="freezeBtn"
                             class="${state.frozen ? "frozen" : ""}"
-                            onclick=${() => send("toggleFreeze")}
+                            @click=${() => send("toggleFreeze")}
                         >
                             ${state.frozen ? "❄ Unfreeze" : "❄ Freeze"}
                         </button>
-                        <button onclick=${() => send("randomGlitch")}>
+                        <button @click=${() => send("randomGlitch")}>
                             ⚡ Random Glitch
                         </button>
                         <div class="control-group">
@@ -193,7 +193,7 @@
                                 max="30"
                                 step="1"
                                 value="${state.rgbShift}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send("setRgbShift", Number(e.target.value))}
                             />
                         </div>
@@ -210,7 +210,7 @@
                                 max="15"
                                 step="1"
                                 value="${state.scanLines}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send(
                                         "setScanLines",
                                         Number(e.target.value),
@@ -228,14 +228,14 @@
                                 max="20"
                                 step="1"
                                 value="${state.noise}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send("setNoise", Number(e.target.value))}
                             />
                         </div>
                     </div>
                     <div class="info-box">
-                        <div>FPS: <span id="fpsVal">0</span></div>
-                        <div>Resolution: <span id="resVal">-</span></div>
+                        <div>FPS: <span data-ref="fpsVal">0</span></div>
+                        <div>Resolution: <span data-ref="resVal">-</span></div>
                         <div>
                             📡 Self-generated video — no external URLs needed
                         </div>
@@ -246,7 +246,7 @@
                     </div>
                 `,
                 mount(el, ctx) {
-                    const canvas = el.querySelector("#viz");
+                    const canvas = el.querySelector('canvas');
                     const c = canvas.getContext("2d");
                     let video, W, H;
                     let fpsCounter = 0,
@@ -325,7 +325,7 @@
                         video.playsInline = true;
                         video.addEventListener("loadedmetadata", () => {
                             resize();
-                            el.querySelector("#resVal").textContent = "640×360";
+                            el.querySelector('[data-ref="resVal"]').textContent = "640×360";
                             video.play();
                             ctx.send("setPlaying", true);
                             loop();
@@ -455,7 +455,7 @@
                             );
                             fpsCounter = 0;
                             fpsTime = now;
-                            el.querySelector("#fpsVal").textContent = lastFps;
+                            el.querySelector('[data-ref="fpsVal"]').textContent = lastFps;
                         }
                     }
 

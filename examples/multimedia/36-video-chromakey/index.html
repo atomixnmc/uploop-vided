@@ -201,20 +201,20 @@
                                     ? "Original"
                                     : "Chroma Key Output"}</span
                             >
-                            <canvas id="canvas1"></canvas>
+                            <canvas data-ref="canvas1"></canvas>
                         </div>
                     </div>
                     <div class="controls">
                         <button
                             id="playBtn"
                             class="${state.playing ? "playing" : ""}"
-                            onclick=${() => send("togglePlay")}
+                            @click=${() => send("togglePlay")}
                         >
                             ${state.playing ? "⏸ Pause" : "▶ Play"}
                         </button>
                         <button
                             class="${state.showBefore ? "mode-active" : ""}"
-                            onclick=${() => send("toggleBefore")}
+                            @click=${() => send("toggleBefore")}
                         >
                             ${state.showBefore ? "📷 After" : "📷 Before"}
                         </button>
@@ -225,7 +225,7 @@
                             <input
                                 type="color"
                                 value="${state.keyColor}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send("setKeyColor", e.target.value)}
                             />
                         </div>
@@ -244,7 +244,7 @@
                                 max="0.8"
                                 step="0.01"
                                 value="${state.tolerance}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send(
                                         "setTolerance",
                                         Number(e.target.value),
@@ -264,7 +264,7 @@
                                 max="0.2"
                                 step="0.005"
                                 value="${state.feather}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send("setFeather", Number(e.target.value))}
                             />
                         </div>
@@ -283,7 +283,7 @@
                                 max="1"
                                 step="0.05"
                                 value="${state.spillSuppression}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send("setSpill", Number(e.target.value))}
                             />
                         </div>
@@ -298,7 +298,7 @@
                                         class="${state.bgMode === bg.k
                                             ? "mode-active"
                                             : ""}"
-                                        onclick=${() => send("setBgMode", bg.k)}
+                                        @click=${() => send("setBgMode", bg.k)}
                                         style="font-size:11px;padding:6px 10px;"
                                     >
                                         ${bg.n}
@@ -308,8 +308,8 @@
                         </div>
                     </div>
                     <div class="info-box">
-                        <div>FPS: <span id="fpsVal">0</span></div>
-                        <div>Key: <span id="keyInfo">-</span></div>
+                        <div>FPS: <span data-ref="fpsVal">0</span></div>
+                        <div>Key: <span data-ref="keyInfo">-</span></div>
                         <div>
                             📡 Self-generated video — no external URLs needed
                         </div>
@@ -320,7 +320,7 @@
                     </div>
                 `,
                 mount(el, ctx) {
-                    const canvas = el.querySelector("#canvas1");
+                    const canvas = el.querySelector('[data-ref="canvas1"]');
                     const c = canvas.getContext("2d");
                     let video,
                         bgVideo,
@@ -554,13 +554,13 @@
                             c.putImageData(imgData, 0, 0);
                         }
 
-                        el.querySelector("#keyInfo").textContent =
+                        el.querySelector('[data-ref="keyInfo"]').textContent =
                             `RGB(${kR},${kG},${kB})`;
 
                         fpsCounter++;
                         const now = performance.now();
                         if (now - fpsTime >= 1000) {
-                            el.querySelector("#fpsVal").textContent =
+                            el.querySelector('[data-ref="fpsVal"]').textContent =
                                 Math.round(
                                     fpsCounter / ((now - fpsTime) / 1000),
                                 );

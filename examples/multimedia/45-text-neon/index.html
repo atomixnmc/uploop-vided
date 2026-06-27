@@ -178,7 +178,7 @@
         <div class="info">Canvas layered blur glow · @uploop/timeline easing</div>
       `,
       mount(el, ctx) {
-        const canvas = el.querySelector('#canvas')
+        const canvas = el.querySelector('canvas')
         let start = null, elapsed = 0, raf
         function loop(now) {
           const s = ctx.get()

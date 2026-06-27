@@ -182,12 +182,12 @@
                             Smooth/Hard</span
                         >
                     </div>
-                    <canvas id="viz"></canvas>
+                    <canvas data-ref="viz"></canvas>
                     <div class="controls">
                         <button
                             id="playBtn"
                             class="${state.playing ? "playing" : ""}"
-                            onclick=${() => send("togglePlay")}
+                            @click=${() => send("togglePlay")}
                         >
                             ${state.playing ? "⏸ Pause" : "▶ Play"}
                         </button>
@@ -204,7 +204,7 @@
                                 max="64"
                                 step="1"
                                 value="${state.blockSize}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send(
                                         "setBlockSize",
                                         Number(e.target.value),
@@ -213,7 +213,7 @@
                         </div>
                         <button
                             class="${state.smooth ? "mode-active" : ""}"
-                            onclick=${() => send("toggleSmooth")}
+                            @click=${() => send("toggleSmooth")}
                         >
                             ${state.smooth ? "◉ Smooth" : "◻ Hard"}
                         </button>
@@ -228,7 +228,7 @@
                                         class="${state.region === r.k
                                             ? "mode-active"
                                             : ""}"
-                                        onclick=${() => send("setRegion", r.k)}
+                                        @click=${() => send("setRegion", r.k)}
                                         style="font-size:11px;padding:6px 10px;"
                                     >
                                         ${r.n}
@@ -248,7 +248,7 @@
                                         class="${state.preset === p.n
                                             ? "mode-active"
                                             : ""}"
-                                        onclick=${() =>
+                                        @click=${() =>
                                             send("setPreset", p.n, p.s)}
                                     >
                                         ${p.n}
@@ -258,8 +258,8 @@
                         </div>
                     </div>
                     <div class="info-box">
-                        <div>FPS: <span id="fpsVal">0</span></div>
-                        <div>Effective Res: <span id="resInfo">-</span></div>
+                        <div>FPS: <span data-ref="fpsVal">0</span></div>
+                        <div>Effective Res: <span data-ref="resInfo">-</span></div>
                         <div>
                             📡 Self-generated video — no external URLs needed
                         </div>
@@ -270,7 +270,7 @@
                     </div>
                 `,
                 mount(el, ctx) {
-                    const canvas = el.querySelector("#viz");
+                    const canvas = el.querySelector('canvas');
                     const c = canvas.getContext("2d");
                     let video,
                         W,
@@ -429,13 +429,13 @@
                         pixelateRegion(ctx.get().blockSize, ctx.get().region);
 
                         const bs = ctx.get().blockSize;
-                        el.querySelector("#resInfo").textContent =
+                        el.querySelector('[data-ref="resInfo"]').textContent =
                             `${Math.floor(W / bs)}×${Math.floor(H / bs)}`;
 
                         fpsCounter++;
                         const now = performance.now();
                         if (now - fpsTime >= 1000) {
-                            el.querySelector("#fpsVal").textContent =
+                            el.querySelector('[data-ref="fpsVal"]').textContent =
                                 Math.round(
                                     fpsCounter / ((now - fpsTime) / 1000),
                                 );

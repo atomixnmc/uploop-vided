@@ -156,7 +156,7 @@
                     showStereo: false,
                     ampL: 0,
                     ampR: 0,
-                    uploadLabel: "Self-oscillating",
+                    uploadLabel: "Pentatonic Arp",
                 },
                 update: {
                     togglePlay: (s) => ({ ...s, playing: !s.playing }),
@@ -172,12 +172,12 @@
                         <h1>📊 Music Waves — Waveform Oscilloscope</h1>
                         <span>Time-Domain · Stereo · Multi-Mode</span>
                     </div>
-                    <canvas id="viz"></canvas>
+                    <canvas data-ref="viz"></canvas>
                     <div class="controls">
                         <button
                             id="playBtn"
                             class="${state.playing ? "playing" : ""}"
-                            onclick=${() => send("togglePlay")}
+                            @click=${() => send("togglePlay")}
                         >
                             ${state.playing ? "⏸ Pause" : "▶ Play"}
                         </button>
@@ -192,7 +192,7 @@
                                         class="${state.mode === m.k
                                             ? "mode-active"
                                             : ""}"
-                                        onclick=${() => send("setMode", m.k)}
+                                        @click=${() => send("setMode", m.k)}
                                     >
                                         ${m.n}
                                     </button>
@@ -201,7 +201,7 @@
                         </div>
                         <button
                             class="${state.showStereo ? "mode-active" : ""}"
-                            onclick=${() => send("toggleStereo")}
+                            @click=${() => send("toggleStereo")}
                         >
                             ${state.showStereo ? "🔊 Stereo" : "🔉 Mono"}
                         </button>
@@ -218,7 +218,7 @@
                                 max="1"
                                 step="0.05"
                                 value="${state.volume}"
-                                oninput=${(e) =>
+                                @input=${(e) =>
                                     send("setVolume", Number(e.target.value))}
                             />
                         </div>
@@ -233,7 +233,7 @@
                             id="fileUpload"
                             accept="audio/*"
                             style="display:none"
-                            onchange=${(e) => {
+                            @change=${(e) => {
                                 const f = e.target.files?.[0];
                                 if (f) {
                                     send("setLabel", f.name);
@@ -243,8 +243,8 @@
                         />
                     </div>
                     <div class="info-box">
-                        <div>L Amp: <span id="ampL">0.00</span></div>
-                        <div>R Amp: <span id="ampR">0.00</span></div>
+                        <div>L Amp: <span data-ref="ampL">0.00</span></div>
+                        <div>R Amp: <span data-ref="ampR">0.00</span></div>
                         <div>
                             Using <code>@uploop/timeline</code> ·
                             <code>@uploop/compositor</code>
@@ -252,7 +252,7 @@
                     </div>
                 `,
                 mount(el, ctx) {
-                    const canvas = el.querySelector("#viz");
+                    const canvas = el.querySelector('canvas');
                     const c = canvas.getContext("2d");
                     let audioCtx,
                         analyser,
@@ -271,42 +271,112 @@
                         canvas.height = rect.height * devicePixelRatio;
                     }
 
-                    function createStereoOscillators(
+                    function createStereoMusicGenerators(
                         audioCtx,
                         analyserL,
                         analyserR,
                     ) {
-                        // Left channel: 55 Hz
-                        const oscL = audioCtx.createOscillator();
-                        const modL = audioCtx.createOscillator();
-                        const modGainL = audioCtx.createGain();
-                        oscL.type = "sawtooth";
-                        oscL.frequency.value = 55;
-                        modL.type = "sine";
-                        modL.frequency.value = 110;
-                        modGainL.gain.value = 200;
-                        modL.connect(modGainL);
-                        modGainL.connect(oscL.frequency);
-                        oscL.connect(analyserL);
+                        const notes = [
+                            220, 261.63, 293.66, 329.63, 392, 440, 523.25,
+                            587.33, 659.25, 784,
+                        ];
 
-                        // Right channel: 55.5 Hz (slight offset for stereo width)
-                        const oscR = audioCtx.createOscillator();
-                        const modR = audioCtx.createOscillator();
-                        const modGainR = audioCtx.createGain();
-                        oscR.type = "sawtooth";
-                        oscR.frequency.value = 55.5;
-                        modR.type = "sine";
-                        modR.frequency.value = 111;
-                        modGainR.gain.value = 200;
-                        modR.connect(modGainR);
-                        modGainR.connect(oscR.frequency);
-                        oscR.connect(analyserR);
+                        function createChannel(analyser, noteOffset) {
+                            // Pad oscillator — soft triangle wave with slow LFO
+                            const padOsc = audioCtx.createOscillator();
+                            padOsc.type = "triangle";
+                            padOsc.frequency.value = 220;
 
-                        oscL.start();
-                        modL.start();
-                        oscR.start();
-                        modR.start();
-                        return { oscL, modL, modGainL, oscR, modR, modGainR };
+                            const padLFO = audioCtx.createOscillator();
+                            padLFO.type = "sine";
+                            padLFO.frequency.value = 0.3 + Math.random() * 0.05;
+                            const padLFOGain = audioCtx.createGain();
+                            padLFOGain.gain.value = 15;
+                            padLFO.connect(padLFOGain);
+                            padLFOGain.connect(padOsc.frequency);
+
+                            const padFilter = audioCtx.createBiquadFilter();
+                            padFilter.type = "lowpass";
+                            padFilter.frequency.value = 800;
+                            padFilter.Q.value = 1;
+
+                            padOsc.connect(padFilter);
+
+                            const padGain = audioCtx.createGain();
+                            padGain.gain.value = 0.15;
+                            padFilter.connect(padGain);
+                            padGain.connect(analyser);
+
+                            padOsc.start();
+                            padLFO.start();
+
+                            // Arpeggio — cycling through pentatonic notes
+                            const arpOsc = audioCtx.createOscillator();
+                            arpOsc.type = "sine";
+                            arpOsc.frequency.value =
+                                notes[noteOffset % notes.length];
+
+                            const arpGain = audioCtx.createGain();
+                            arpGain.gain.value = 0.1;
+                            arpOsc.connect(arpGain);
+                            arpGain.connect(analyser);
+
+                            arpOsc.start();
+
+                            // Arpeggio sequencer — offset start position for stereo width
+                            let noteIndex = noteOffset;
+                            let beatCount = 0;
+                            const arpInterval = setInterval(() => {
+                                const now = audioCtx.currentTime;
+                                arpOsc.frequency.setTargetAtTime(
+                                    notes[noteIndex],
+                                    now,
+                                    0.02,
+                                );
+                                arpGain.gain.setTargetAtTime(0.12, now, 0.01);
+                                setTimeout(() => {
+                                    arpGain.gain.setTargetAtTime(
+                                        0.02,
+                                        audioCtx.currentTime,
+                                        0.05,
+                                    );
+                                }, 120);
+
+                                noteIndex = (noteIndex + 1) % notes.length;
+                                beatCount++;
+                                if (beatCount % 8 === 0) {
+                                    const rootNote =
+                                        notes[Math.floor(Math.random() * 5)];
+                                    padOsc.frequency.setTargetAtTime(
+                                        rootNote,
+                                        audioCtx.currentTime,
+                                        0.5,
+                                    );
+                                }
+                            }, 180);
+
+                            return {
+                                nodes: [padOsc, padLFO, arpOsc],
+                                gains: [padGain, arpGain, padLFOGain],
+                                filters: [padFilter],
+                                stop() {
+                                    clearInterval(arpInterval);
+                                },
+                            };
+                        }
+
+                        const chL = createChannel(analyserL, 0);
+                        const chR = createChannel(analyserR, 3); // offset arp start for L/R separation
+
+                        return {
+                            nodes: [...chL.nodes, ...chR.nodes],
+                            gains: [...chL.gains, ...chR.gains],
+                            filters: [...chL.filters, ...chR.filters],
+                            stop() {
+                                chL.stop();
+                                chR.stop();
+                            },
+                        };
                     }
 
                     function initAudio() {
@@ -331,7 +401,7 @@
                         gainNode.gain.value = ctx.get().volume;
 
                         // Create stereo oscillators, each connected to its own analyser
-                        oscNodes = createStereoOscillators(
+                        oscNodes = createStereoMusicGenerators(
                             audioCtx,
                             analyserL,
                             analyserR,
@@ -345,10 +415,8 @@
                         merger.connect(gainNode);
                         gainNode.connect(audioCtx.destination);
 
-                        // Mono path: feed analyser from left oscillator (for waveform display)
-                        const monoGain = audioCtx.createGain();
-                        oscNodes.oscL.connect(monoGain);
-                        monoGain.connect(analyser);
+                        // Mono path: tap from left analyser for waveform display
+                        analyserL.connect(analyser);
                         analyser.connect(gainNode);
 
                         // Store all analysers for the render loop
@@ -415,10 +483,7 @@
                         if (loop._raf) cancelAnimationFrame(loop._raf);
                         if (oscNodes) {
                             try {
-                                oscNodes.oscL.stop();
-                                oscNodes.modL.stop();
-                                oscNodes.oscR.stop();
-                                oscNodes.modR.stop();
+                                oscNodes.stop();
                             } catch (_) {}
                             oscNodes = null;
                         }
@@ -583,9 +648,9 @@
                                 "rgba(100,160,255,1)",
                             );
 
-                            el.querySelector("#ampL").textContent =
+                            el.querySelector('[data-ref="ampL"]').textContent =
                                 ampL.toFixed(3);
-                            el.querySelector("#ampR").textContent =
+                            el.querySelector('[data-ref="ampR"]').textContent =
                                 ampR.toFixed(3);
                         } else {
                             const amp =
@@ -602,9 +667,9 @@
                                 H * 0.4,
                                 `hsl(${hue},70%,55%)`,
                             );
-                            el.querySelector("#ampL").textContent =
+                            el.querySelector('[data-ref="ampL"]').textContent =
                                 amp.toFixed(3);
-                            el.querySelector("#ampR").textContent = (
+                            el.querySelector('[data-ref="ampR"]').textContent = (
                                 amp * 0.98
                             ).toFixed(3);
                         }

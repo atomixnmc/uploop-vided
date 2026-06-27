@@ -115,7 +115,7 @@
         <a href="../.." class="back">← Examples</a>
         <h1>48 · Reverse Playback</h1>
         <div class="stage">
-            <canvas id="viz-canvas" width="640" height="360"></canvas>
+            <canvas data-ref="viz-canvas" width="640" height="360"></canvas>
         </div>
         <div class="frame-counter" id="counter">Frame 0 / 240</div>
         <div class="progress-bar" id="pbar">
@@ -248,7 +248,7 @@
                         <h1>48 · Reverse Playback</h1>
                         <div class="stage">
                             <canvas
-                                id="viz-canvas"
+                                data-ref="viz-canvas"
                                 width="640"
                                 height="360"
                             ></canvas>
@@ -311,7 +311,7 @@
                     `;
                 },
                 mount(el, ctx) {
-                    const canvas = el.querySelector("#viz-canvas");
+                    const canvas = el.querySelector('canvas');
                     const c = canvas.getContext("2d");
                     const gen = createVideoStream();
 

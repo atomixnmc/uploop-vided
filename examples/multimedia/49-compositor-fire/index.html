@@ -47,9 +47,9 @@
 <body>
   <a href="../.." class="back">← Examples</a>
   <h1>49 · Fire / Particle Compositing</h1>
-  <div class="stage" id="stage">
+  <div class="stage" data-ref="stage">
     <canvas id="canvas" width="800" height="450"></canvas>
-    <video id="video" src="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4" muted loop playsinline style="display:none;"></video>
+    <video data-ref="video" src="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4" muted loop playsinline style="display:none;"></video>
   </div>
   <div class="controls" id="controls"></div>
   <div class="info">Procedural fire particles · @uploop/timeline easing · @uploop/compositor blendModes</div>
@@ -172,7 +172,7 @@
         <h1>49 · Fire / Particle Compositing</h1>
         <div class="stage">
           <canvas id="canvas" width="800" height="450"></canvas>
-          <video id="video"
+          <video data-ref="video"
             src="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4"
             muted loop playsinline
             style="display:${state.showVideo ? 'block' : 'none'};opacity:0.5;mix-blend-mode:screen;"
@@ -197,8 +197,8 @@
         <div class="info">Procedural fire particles · @uploop/timeline easing · @uploop/compositor blendModes</div>
       `,
       mount(el, ctx) {
-        const canvas = el.querySelector('#canvas')
-        const video = el.querySelector('#video')
+        const canvas = el.querySelector('canvas')
+        const video = el.querySelector('video')
         let sparks = []
         let t = 0; let raf; let last = 0
 
