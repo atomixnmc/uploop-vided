@@ -278,3 +278,8 @@ const CrossfadeAudio = component("CrossfadeAudio", {
 
 export { CrossfadeAudio };
 export default CrossfadeAudio;
+
+// Auto-mount
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+CrossfadeAudio.mount(el);

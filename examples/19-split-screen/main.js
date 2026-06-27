@@ -227,3 +227,8 @@ const SplitScreen = component("SplitScreen", {
 
 export { SplitScreen };
 export default SplitScreen;
+
+// Auto-mount
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+SplitScreen.mount(el);

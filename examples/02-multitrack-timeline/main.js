@@ -334,6 +334,6 @@ export { TimelineDemo };
 export default TimelineDemo;
 
 // Auto-mount
-const stage = document.querySelector(".stage");
-if (stage) stage.replaceWith(new TimelineDemo());
-else document.body.appendChild(new TimelineDemo());
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+TimelineDemo.mount(el);

@@ -167,3 +167,8 @@ const ZoomTransitions = component("ZoomTransitions", {
 
 export { ZoomTransitions };
 export default ZoomTransitions;
+
+// Auto-mount
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+ZoomTransitions.mount(el);

@@ -260,6 +260,6 @@ export { VideoWall };
 export default VideoWall;
 
 // Auto-mount
-const grid = document.querySelector("#grid");
-if (grid) grid.replaceWith(new VideoWall());
-else document.body.appendChild(new VideoWall());
+const el = document.querySelector("#grid") || document.body;
+el.innerHTML = "";
+VideoWall.mount(el);

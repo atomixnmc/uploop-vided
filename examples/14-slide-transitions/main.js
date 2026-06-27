@@ -172,3 +172,8 @@ const SlideTransitions = component("SlideTransitions", {
 
 export { SlideTransitions };
 export default SlideTransitions;
+
+// Auto-mount
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+SlideTransitions.mount(el);

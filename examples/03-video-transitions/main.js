@@ -364,6 +364,6 @@ export { VideoTransitions };
 export default VideoTransitions;
 
 // Auto-mount
-const stage = document.querySelector(".stage");
-if (stage) stage.replaceWith(new VideoTransitions());
-else document.body.appendChild(new VideoTransitions());
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+VideoTransitions.mount(el);

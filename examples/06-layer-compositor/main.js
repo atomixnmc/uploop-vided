@@ -265,6 +265,6 @@ export { LayerCompositor };
 export default LayerCompositor;
 
 // Auto-mount
-const stage = document.querySelector(".stage");
-if (stage) stage.replaceWith(new LayerCompositor());
-else document.body.appendChild(new LayerCompositor());
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+LayerCompositor.mount(el);

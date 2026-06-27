@@ -249,6 +249,6 @@ export { PictureInPicture };
 export default PictureInPicture;
 
 // Auto-mount
-const stage = document.querySelector("#stage");
-if (stage) stage.replaceWith(new PictureInPicture());
-else document.body.appendChild(new PictureInPicture());
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+PictureInPicture.mount(el);

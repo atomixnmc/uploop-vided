@@ -21,14 +21,22 @@ test.describe("Examples Index Page", () => {
     );
   });
 
-  test("has Basic and Advanced sections", async ({ page }) => {
+  test("has Basic and Advanced tabs", async ({ page }) => {
     await page.goto("/");
     await expect(
-      page.locator("h2").filter({ hasText: "Basic Examples" }),
+      page.locator(".tab-btn").filter({ hasText: "Basic Examples" }),
     ).toBeVisible();
     await expect(
-      page.locator("h2").filter({ hasText: "Advanced Examples" }),
+      page.locator(".tab-btn").filter({ hasText: "Advanced Examples" }),
     ).toBeVisible();
+  });
+
+  test("Basic tab is active by default", async ({ page }) => {
+    await page.goto("/");
+    const basicPanel = page.locator("#panel-basic");
+    await expect(basicPanel).toHaveClass(/active/);
+    const advPanel = page.locator("#panel-advanced");
+    await expect(advPanel).not.toHaveClass(/active/);
   });
 
   test("has Editor Workspace link at top of Basic section", async ({
@@ -42,22 +50,15 @@ test.describe("Examples Index Page", () => {
 
   test(`lists all ${BASIC_COUNT} basic examples`, async ({ page }) => {
     await page.goto("/");
-    // Basic section cards (including editor)
-    const basicSection = page
-      .locator("h2")
-      .filter({ hasText: "Basic Examples" });
-    const basicList = basicSection.locator("+ .example-list");
-    const cards = basicList.locator(".example-card");
+    // Basic panel has example cards (including editor)
+    const cards = page.locator("#panel-basic .example-card");
     await expect(cards).toHaveCount(BASIC_COUNT + 1); // +1 for editor
   });
 
   test(`lists all ${ADVANCED_COUNT} advanced examples`, async ({ page }) => {
     await page.goto("/");
-    // The second .example-list on the page is the advanced section
-    const allLists = page.locator(".example-list");
-    const count = await allLists.count();
-    expect(count).toBeGreaterThanOrEqual(2);
-    const advCards = allLists.nth(1).locator(".example-card");
+    // Advanced panel is hidden by default, but cards still exist in DOM
+    const advCards = page.locator("#panel-advanced .example-card");
     await expect(advCards).toHaveCount(ADVANCED_COUNT);
   });
 

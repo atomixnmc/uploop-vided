@@ -294,6 +294,6 @@ export { TextOverlay };
 export default TextOverlay;
 
 // Auto-mount
-const stage = document.querySelector(".stage");
-if (stage) stage.replaceWith(new TextOverlay());
-else document.body.appendChild(new TextOverlay());
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+TextOverlay.mount(el);

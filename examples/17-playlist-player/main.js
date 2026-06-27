@@ -322,10 +322,7 @@ export default PlaylistPlayer;
 
 // ── Mount ─────────────────────────────────────────────────────────
 
-while (document.body.firstChild) {
-  document.body.removeChild(document.body.firstChild);
-}
-document.body.appendChild(new PlaylistPlayer());
+PlaylistPlayer.mount(document.body);
 
 console.log(
   "%c📋 Playlist Player%c | %d clips | fade transition",

@@ -166,3 +166,8 @@ const FadeTransitions = component("FadeTransitions", {
 
 export { FadeTransitions };
 export default FadeTransitions;
+
+// Auto-mount
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+FadeTransitions.mount(el);

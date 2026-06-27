@@ -206,6 +206,6 @@ export { Slideshow };
 export default Slideshow;
 
 // Auto-mount
-document.querySelector(".stage")
-  ? document.querySelector(".stage").replaceWith(new Slideshow())
-  : document.body.appendChild(new Slideshow());
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+Slideshow.mount(el);

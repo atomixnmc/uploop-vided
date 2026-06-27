@@ -347,6 +347,6 @@ export { KeyframeEditor };
 export default KeyframeEditor;
 
 // Auto-mount
-const stage = document.querySelector(".stage");
-if (stage) stage.replaceWith(new KeyframeEditor());
-else document.body.appendChild(new KeyframeEditor());
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+KeyframeEditor.mount(el);

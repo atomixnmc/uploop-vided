@@ -184,6 +184,6 @@ export { BlendModesDemo };
 export default BlendModesDemo;
 
 // Auto-mount
-const canvas = document.querySelector("#cnv");
-if (canvas) canvas.replaceWith(new BlendModesDemo());
-else document.body.appendChild(new BlendModesDemo());
+const el = document.querySelector("canvas") || document.body;
+el.innerHTML = "";
+BlendModesDemo.mount(el);

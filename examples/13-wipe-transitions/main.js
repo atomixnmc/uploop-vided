@@ -196,3 +196,8 @@ const WipeTransitions = component("WipeTransitions", {
 
 export { WipeTransitions };
 export default WipeTransitions;
+
+// Auto-mount
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+WipeTransitions.mount(el);

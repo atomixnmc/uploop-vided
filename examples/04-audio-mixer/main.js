@@ -383,6 +383,6 @@ export { AudioMixer };
 export default AudioMixer;
 
 // Auto-mount
-const stage = document.querySelector(".stage");
-if (stage) stage.replaceWith(new AudioMixer());
-else document.body.appendChild(new AudioMixer());
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+AudioMixer.mount(el);

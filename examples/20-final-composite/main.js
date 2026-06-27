@@ -446,10 +446,7 @@ export default FinalComposite;
 
 // ── Mount ─────────────────────────────────────────────────────────
 
-while (document.body.firstChild) {
-  document.body.removeChild(document.body.firstChild);
-}
-document.body.appendChild(new FinalComposite());
+FinalComposite.mount(document.body);
 
 console.log(
   "%c🎬 Final Composite%c | %d tracks · %d clips · duration %ss",

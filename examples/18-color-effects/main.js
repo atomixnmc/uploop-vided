@@ -245,3 +245,8 @@ const ColorEffects = component("ColorEffects", {
 
 export { ColorEffects };
 export default ColorEffects;
+
+// Auto-mount
+const el = document.querySelector(".stage") || document.body;
+el.innerHTML = "";
+ColorEffects.mount(el);

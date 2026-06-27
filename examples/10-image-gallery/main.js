@@ -184,7 +184,7 @@ export default ImageGallery;
 while (document.body.firstChild) {
   document.body.removeChild(document.body.firstChild);
 }
-document.body.appendChild(new ImageGallery());
+ImageGallery.mount(document.body);
 
 console.log(
   "%c🖼️ Gallery%c | %d slides | fade transition via @uploop/compositor",
