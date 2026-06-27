@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Crossfade Audio — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 24px;
+      padding: 24px;
+    }
+    h2 { font-size: 18px; font-weight: 600; color: #ccc; }
+    .card {
+      background: #151520;
+      border-radius: 12px;
+      padding: 24px;
+      width: min(500px, 90vw);
+    }
+    .track-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .track-label span { font-size: 14px; font-weight: 600; }
+    .meter {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+    .meter-bar {
+      flex: 1;
+      height: 8px;
+      background: #222;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #4f8, #8f4);
+      border-radius: 4px;
+      transition: width 0.1s;
+    }
+    .meter-val { font-size: 12px; color: #888; width: 40px; text-align: right; }
+    .crossfader {
+      margin: 20px 0;
+    }
+    .crossfader label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: #aaa;
+    }
+    .crossfader label span { color: #4f8; font-weight: 700; }
+    input[type="range"] {
+      width: 100%;
+      accent-color: #4f8;
+      cursor: pointer;
+    }
+    .play-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .play-row button {
+      background: #151520;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 8px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+    .play-row button:hover { background: #1e1e30; }
+    .play-row button.playing { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .info {
+      font-size: 13px;
+      color: #666;
+    }
+    .info code { color: #4f8; }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href=".." class="back">← Examples</a>
+  <h2>🎵 Audio Crossfade</h2>
+  <div class="card">
+    <div class="track-label"><span>🔊 Track A</span></div>
+    <div class="meter">
+      <div class="meter-bar"><div class="meter-fill" id="meter-a"></div></div>
+      <span class="meter-val" id="vol-a">0%</span>
+    </div>
+    <div class="track-label"><span>🔊 Track B</span></div>
+    <div class="meter">
+      <div class="meter-bar"><div class="meter-fill" id="meter-b"></div></div>
+      <span class="meter-val" id="vol-b">0%</span>
+    </div>
+    <div class="crossfader">
+      <label>Crossfade <span id="xfade-val">50% A / 50% B</span></label>
+      <input type="range" id="crossfade" min="0" max="100" value="50" step="1">
+    </div>
+    <div class="play-row">
+      <button id="btn-play">▶ Play Both</button>
+      <button id="btn-stop">⏹ Stop</button>
+    </div>
+  </div>
+  <div class="info">
+    Using <code>easing</code> from <code>@uploop/timeline</code> for smooth volume curves
+  </div>
+  <audio id="audio-a" src="https://samplelib.com/lib/preview/mp3/sample-3s.mp3" preload="auto" loop></audio>
+  <audio id="audio-b" src="https://samplelib.com/lib/preview/mp3/sample-9s.mp3" preload="auto" loop></audio>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

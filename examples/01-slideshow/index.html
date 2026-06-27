@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Slideshow — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+    }
+    .stage {
+      width: min(800px, 90vw);
+      height: min(500px, 60vh);
+      background: #151520;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 3rem;
+      font-weight: 700;
+      opacity: 0;
+      transition: none; /* handled by JS */
+    }
+    .dots {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+    }
+    .dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+      background: #333;
+      transition: background 0.3s;
+      cursor: pointer;
+    }
+    .dot.active { background: #4f8; }
+    .info {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #666;
+    }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href=".." class="back">← Examples</a>
+  <div class="stage">
+    <div class="slide slide-0" style="background:#1a3a5c;">🌊</div>
+    <div class="slide slide-1" style="background:#3a1a5c;">🔥</div>
+    <div class="slide slide-2" style="background:#1a5c3a;">🌿</div>
+    <div class="slide slide-3" style="background:#5c3a1a;">☀️</div>
+    <div class="slide slide-4" style="background:#3a1a3a;">🌸</div>
+  </div>
+  <div class="dots"></div>
+  <div class="info">
+    Using <code>@uploop/timeline</code> easing functions for smooth transitions
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

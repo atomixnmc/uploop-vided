@@ -1,0 +1,866 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Linear Algebra — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 24px 40px;
+      gap: 16px;
+    }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+      z-index: 100;
+    }
+    .back:hover { color: #fff; }
+    .title-bar {
+      width: min(850px, 90vw);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .title-bar h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #4f8;
+    }
+    .title-bar span { font-size: 12px; color: #666; }
+    .tabs {
+      display: flex;
+      gap: 4px;
+    }
+    .tabs button {
+      background: #151520;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 8px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .tabs button:hover { background: #1e1e30; }
+    .tabs button.active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .main-layout {
+      width: min(850px, 90vw);
+      display: flex;
+      gap: 16px;
+    }
+    .stage {
+      flex: 1;
+      height: min(460px, 55vh);
+      background: #151520;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    .stage canvas { width: 100%; height: 100%; display: block; }
+    .sidebar {
+      width: 240px;
+      background: #151520;
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      font-size: 12px;
+    }
+    .sidebar h3 {
+      font-size: 13px;
+      color: #4f8;
+      margin: 0;
+    }
+    .matrix-input {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 4px;
+    }
+    .matrix-input input {
+      width: 100%;
+      background: #0a0a0f;
+      border: 1px solid #333;
+      color: #e0e0e0;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 14px;
+      text-align: center;
+      font-family: 'Courier New', monospace;
+    }
+    .matrix-input input:focus {
+      border-color: #4f8;
+      outline: none;
+    }
+    .sidebar label {
+      color: #888;
+      font-size: 11px;
+    }
+    .sidebar .row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sidebar .row span {
+      color: #4f8;
+      min-width: 36px;
+      text-align: right;
+      font-family: 'Courier New', monospace;
+    }
+    .sidebar input[type="range"] {
+      flex: 1;
+      accent-color: #4f8;
+    }
+    .sidebar button {
+      background: #1e1e30;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      transition: all 0.2s;
+    }
+    .sidebar button:hover { background: #2a2a40; }
+    .sidebar button.active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .info-panel {
+      width: min(850px, 90vw);
+      background: #151520;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: #aaa;
+      line-height: 1.5;
+      min-height: 42px;
+    }
+    .info-panel .formula {
+      color: #4f8;
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+    }
+    .info-panel .value { color: #f8c040; font-weight: 600; }
+    .legend {
+      display: flex;
+      gap: 14px;
+      width: min(850px, 90vw);
+    }
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: #888;
+    }
+    .legend .swatch {
+      width: 10px; height: 10px;
+      border-radius: 2px;
+    }
+
+    @media (max-width: 700px) {
+      .main-layout { flex-direction: column; }
+      .sidebar { width: 100%; flex-direction: row; flex-wrap: wrap; }
+      .matrix-input { grid-template-columns: repeat(4, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+
+  <div class="title-bar">
+    <h1>🔢 Linear Algebra</h1>
+    <span>Vectors · Matrices · Span</span>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="vectors" class="active">Vectors</button>
+    <button data-tab="matrix">Matrix Transform</button>
+    <button data-tab="span">Span</button>
+  </div>
+
+  <div class="main-layout">
+    <div class="stage">
+      <canvas id="canvas"></canvas>
+    </div>
+    <div class="sidebar" id="sidebar"></div>
+  </div>
+
+  <div class="info-panel" id="info"></div>
+  <div class="legend" id="legend"></div>
+
+  <script type="module">
+    import { easing } from '@uploop/timeline'
+    import { blendModes } from '@uploop/compositor'
+
+    const canvas = document.getElementById('canvas')
+    const ctx = canvas.getContext('2d')
+    const infoPanel = document.getElementById('info')
+    const sidebarEl = document.getElementById('sidebar')
+    const legendDiv = document.getElementById('legend')
+    const tabButtons = document.querySelectorAll('.tabs button')
+
+    let W, H, currentTab = 'vectors'
+
+    // Coordinate system: origin at center, y-up
+    const scale = 60 // pixels per unit
+
+    function toScreen(v) {
+      return { x: W / 2 + v.x * scale, y: H / 2 - v.y * scale }
+    }
+    function toWorld(s) {
+      return { x: (s.x - W / 2) / scale, y: (H / 2 - s.y) / scale }
+    }
+
+    // ── Vectors Tab ───────────────────────────────────────────────────
+    let vecV = { x: 3, y: 2 }
+    let vecU = { x: -1.5, y: 2.5 }
+    let dragVec = null
+    let vecShowSum = true
+    let vecShowScalar = false
+    let vecScalar = 1.5
+
+    // ── Matrix Tab ────────────────────────────────────────────────────
+    let matA = 1, matB = 0.5, matC = -0.3, matD = 1.2
+    let gridPts = []
+
+    function buildGridPts() {
+      gridPts = []
+      const range = 4
+      const step = 0.5
+      for (let x = -range; x <= range; x += step) {
+        for (let y = -range; y <= range; y += step) {
+          gridPts.push({ x, y })
+        }
+      }
+    }
+
+    // ── Span Tab ──────────────────────────────────────────────────────
+    let spanV1 = { x: 2, y: 1 }
+    let spanV2 = { x: -1, y: 2 }
+    let spanCoeff1 = 1
+    let spanCoeff2 = 0.7
+    let spanShowFill = true
+
+    // ── Drawing helpers ───────────────────────────────────────────────
+    function drawAxes() {
+      const cx = W / 2, cy = H / 2
+
+      // Grid
+      ctx.strokeStyle = '#1a1a28'
+      ctx.lineWidth = 0.5
+      for (let i = -10; i <= 10; i++) {
+        const x = cx + i * scale
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
+      }
+      for (let j = -10; j <= 10; j++) {
+        const y = cy - j * scale
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+      }
+
+      // Major grid
+      ctx.strokeStyle = '#222238'
+      ctx.lineWidth = 1
+      for (let i = -10; i <= 10; i++) {
+        if (i === 0) continue
+        const x = cx + i * scale
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
+        const y = cy - i * scale
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+      }
+
+      // Axes
+      ctx.strokeStyle = '#444'
+      ctx.lineWidth = 2
+      ctx.beginPath(); ctx.moveTo(0, cy); ctx.lineTo(W, cy); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(cx, 0); ctx.lineTo(cx, H); ctx.stroke()
+
+      // Tick labels
+      ctx.fillStyle = '#666'
+      ctx.font = '10px system-ui'
+      ctx.textAlign = 'center'
+      for (let i = -4; i <= 4; i++) {
+        if (i === 0) continue
+        const x = cx + i * scale
+        ctx.fillText(i, x, cy + 14)
+        const y = cy - i * scale
+        ctx.fillText(i, cx - 14, y + 4)
+      }
+      ctx.fillText('O', cx - 12, cy + 14)
+    }
+
+    function drawVector(v, color, label, width) {
+      const from = toScreen({ x: 0, y: 0 })
+      const to = toScreen(v)
+      const w = width || 2.5
+
+      // Shaft
+      ctx.strokeStyle = color
+      ctx.lineWidth = w
+      ctx.beginPath()
+      ctx.moveTo(from.x, from.y)
+      ctx.lineTo(to.x, to.y)
+      ctx.stroke()
+
+      // Arrowhead
+      const angle = Math.atan2(to.y - from.y, to.x - from.x)
+      const len = 12
+      ctx.fillStyle = color
+      ctx.beginPath()
+      ctx.moveTo(to.x, to.y)
+      ctx.lineTo(to.x - len * Math.cos(angle - Math.PI / 6), to.y - len * Math.sin(angle - Math.PI / 6))
+      ctx.lineTo(to.x - len * Math.cos(angle + Math.PI / 6), to.y - len * Math.sin(angle + Math.PI / 6))
+      ctx.closePath()
+      ctx.fill()
+
+      // Label
+      if (label) {
+        ctx.fillStyle = color
+        ctx.font = 'bold 13px system-ui'
+        ctx.textAlign = 'left'
+        ctx.fillText(label, to.x + 8, to.y - 8)
+      }
+    }
+
+    // ── Vectors tab render ────────────────────────────────────────────
+    function drawVectors() {
+      ctx.clearRect(0, 0, W, H)
+      drawAxes()
+
+      drawVector(vecV, '#4f8', 'v = (' + vecV.x.toFixed(1) + ', ' + vecV.y.toFixed(1) + ')')
+      drawVector(vecU, '#4fc8ff', 'u = (' + vecU.x.toFixed(1) + ', ' + vecU.y.toFixed(1) + ')', 2)
+
+      // Sum
+      if (vecShowSum) {
+        const sum = { x: vecV.x + vecU.x, y: vecV.y + vecU.y }
+        // Parallelogram
+        const vScr = toScreen(vecV)
+        const uScr = toScreen(vecU)
+        const sumScr = toScreen(sum)
+        const origin = toScreen({ x: 0, y: 0 })
+
+        ctx.strokeStyle = 'rgba(248,192,64,0.3)'
+        ctx.lineWidth = 1
+        ctx.setLineDash([4, 4])
+        ctx.beginPath()
+        ctx.moveTo(vScr.x, vScr.y)
+        ctx.lineTo(sumScr.x, sumScr.y)
+        ctx.lineTo(uScr.x, uScr.y)
+        ctx.stroke()
+        ctx.setLineDash([])
+
+        drawVector(sum, '#f8c040', 'v+u = (' + sum.x.toFixed(1) + ', ' + sum.y.toFixed(1) + ')', 2.5)
+      }
+
+      // Scalar multiplication
+      if (vecShowScalar) {
+        const scaled = { x: vecV.x * vecScalar, y: vecV.y * vecScalar }
+        drawVector(scaled, '#ff8c50', vecScalar.toFixed(1) + '·v', 2)
+      }
+
+      // Draggable endpoints
+      ;[{ v: vecV, c: '#4f8' }, { v: vecU, c: '#4fc8ff' }].forEach(({ v, c }) => {
+        const p = toScreen(v)
+        ctx.fillStyle = c
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, 7, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+      })
+
+      const magV = Math.sqrt(vecV.x ** 2 + vecV.y ** 2)
+      const magU = Math.sqrt(vecU.x ** 2 + vecU.y ** 2)
+      const dot = vecV.x * vecU.x + vecV.y * vecU.y
+      const angle = Math.acos(dot / (magV * magU)) * 180 / Math.PI
+
+      infoPanel.innerHTML = `
+        |v| = <span class="value">${magV.toFixed(2)}</span>  
+        |u| = <span class="value">${magU.toFixed(2)}</span>  
+        v·u = <span class="value">${dot.toFixed(2)}</span>  
+        ∠(v,u) = <span class="value">${angle.toFixed(1)}°</span><br>
+        <span style="color:#666">Drag the colored endpoints to change vectors</span>
+      `
+      legendDiv.innerHTML = `
+        <span><span class="swatch" style="background:#4f8"></span> v</span>
+        <span><span class="swatch" style="background:#4fc8ff"></span> u</span>
+        <span><span class="swatch" style="background:#f8c040"></span> v + u</span>
+      `
+    }
+
+    // ── Matrix tab render ─────────────────────────────────────────────
+    function drawMatrix() {
+      ctx.clearRect(0, 0, W, H)
+      drawAxes()
+
+      // Original grid (faint)
+      ctx.strokeStyle = 'rgba(79,200,255,0.08)'
+      ctx.lineWidth = 0.3
+      gridPts.forEach(p => {
+        const s = toScreen(p)
+        ctx.fillRect(s.x - 1, s.y - 1, 2, 2)
+      })
+
+      // Transformed grid
+      ctx.fillStyle = '#4f8'
+      gridPts.forEach(p => {
+        const tx = matA * p.x + matB * p.y
+        const ty = matC * p.x + matD * p.y
+        const s = toScreen({ x: tx, y: ty })
+        ctx.beginPath()
+        ctx.arc(s.x, s.y, 1.8, 0, Math.PI * 2)
+        ctx.fill()
+      })
+
+      // Basis vectors transformed
+      const e1 = { x: matA, y: matC }
+      const e2 = { x: matB, y: matD }
+      drawVector(e1, '#4f8', '', 2.5)
+      drawVector(e2, '#4fc8ff', '', 2.5)
+
+      // Original basis (faint)
+      const orig = toScreen({ x: 0, y: 0 })
+      const e1Orig = toScreen({ x: 1, y: 0 })
+      const e2Orig = toScreen({ x: 0, y: 1 })
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([3, 5])
+      ctx.beginPath(); ctx.moveTo(orig.x, orig.y); ctx.lineTo(e1Orig.x, e1Orig.y); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(orig.x, orig.y); ctx.lineTo(e2Orig.x, e2Orig.y); ctx.stroke()
+      ctx.setLineDash([])
+
+      // Unit square transformed
+      const corners = [
+        { x: 0, y: 0 },
+        { x: 1, y: 0 },
+        { x: 1, y: 1 },
+        { x: 0, y: 1 },
+      ].map(p => toScreen({ x: matA * p.x + matB * p.y, y: matC * p.x + matD * p.y }))
+
+      ctx.strokeStyle = '#f8c040'
+      ctx.lineWidth = 2
+      ctx.setLineDash([6, 3])
+      ctx.beginPath()
+      corners.forEach((c, i) => i === 0 ? ctx.moveTo(c.x, c.y) : ctx.lineTo(c.x, c.y))
+      ctx.closePath()
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // Eigenvalue check
+      const det = matA * matD - matB * matC
+      const trace = matA + matD
+      const disc = trace * trace - 4 * det
+      let eigenInfo = ''
+
+      if (disc >= 0) {
+        const lambda1 = (trace + Math.sqrt(disc)) / 2
+        const lambda2 = (trace - Math.sqrt(disc)) / 2
+
+        // Find eigenvector for lambda1
+        let ev = null
+        if (Math.abs(matB) > 1e-10) {
+          ev = { x: 1, y: (lambda1 - matA) / matB }
+        } else if (Math.abs(matC) > 1e-10) {
+          ev = { x: (lambda1 - matD) / matC, y: 1 }
+        } else if (Math.abs(matA - lambda1) < 1e-10) {
+          ev = { x: 1, y: 0 }
+        } else {
+          ev = { x: 0, y: 1 }
+        }
+
+        // Normalize
+        const mag = Math.sqrt(ev.x ** 2 + ev.y ** 2) || 1
+        ev.x /= mag; ev.y /= mag
+
+        // Scale for visibility
+        const evScaled = { x: ev.x * 3, y: ev.y * 3 }
+        drawVector(evScaled, '#ff8c50', `λ₁=${lambda1.toFixed(2)}`, 2)
+        if (Math.abs(lambda2 - lambda1) > 0.01) {
+          const ev2Scaled = { x: ev.x * -2.5, y: ev.y * -2.5 }
+          drawVector(ev2Scaled, 'rgba(255,140,80,0.5)', `λ₂=${lambda2.toFixed(2)}`, 1.5)
+        }
+        eigenInfo = `λ₁ = <span class="value">${lambda1.toFixed(2)}</span>, λ₂ = <span class="value">${lambda2.toFixed(2)}</span>`
+      } else {
+        eigenInfo = `No real eigenvalues (discriminant < 0)`
+      }
+
+      infoPanel.innerHTML = `
+        Matrix: <span class="formula">[[${matA.toFixed(1)}, ${matB.toFixed(1)}], [${matC.toFixed(1)}, ${matD.toFixed(1)}]]</span>  
+        det = <span class="value">${det.toFixed(2)}</span>  
+        trace = <span class="value">${trace.toFixed(2)}</span><br>
+        ${eigenInfo}<br>
+        <span style="color:#666">Yellow box = image of unit square | Orange = eigenvector</span>
+      `
+      legendDiv.innerHTML = `
+        <span><span class="swatch" style="background:#4f8"></span> Transformed e₁</span>
+        <span><span class="swatch" style="background:#4fc8ff"></span> Transformed e₂</span>
+        <span><span class="swatch" style="background:#f8c040"></span> Unit square image</span>
+        <span><span class="swatch" style="background:#ff8c50"></span> Eigenvector</span>
+      `
+    }
+
+    // ── Span tab render ───────────────────────────────────────────────
+    function drawSpan() {
+      ctx.clearRect(0, 0, W, H)
+      drawAxes()
+
+      // Span fill
+      if (spanShowFill) {
+        // Draw many linear combinations
+        const steps = 20
+        for (let i = -steps; i <= steps; i++) {
+          for (let j = -steps; j <= steps; j++) {
+            const a = i / steps * 4
+            const b = j / steps * 4
+            const px = a * spanV1.x + b * spanV2.x
+            const py = a * spanV1.y + b * spanV2.y
+            const s = toScreen({ x: px, y: py })
+            const alpha = 0.03
+            ctx.fillStyle = `rgba(79,255,136,${alpha})`
+            ctx.fillRect(s.x - 2, s.y - 2, 4, 4)
+          }
+        }
+      }
+
+      // Vectors
+      drawVector(spanV1, '#4f8', 'v₁', 3)
+      drawVector(spanV2, '#4fc8ff', 'v₂', 3)
+
+      // Combination
+      const comb = {
+        x: spanCoeff1 * spanV1.x + spanCoeff2 * spanV2.x,
+        y: spanCoeff1 * spanV1.y + spanCoeff2 * spanV2.y,
+      }
+
+      // Dashed lines showing combination
+      const o = toScreen({ x: 0, y: 0 })
+      const c1End = toScreen({ x: spanCoeff1 * spanV1.x, y: spanCoeff1 * spanV1.y })
+      const combScr = toScreen(comb)
+
+      ctx.strokeStyle = 'rgba(248,192,64,0.4)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([4, 4])
+      ctx.beginPath(); ctx.moveTo(c1End.x, c1End.y); ctx.lineTo(combScr.x, combScr.y); ctx.stroke()
+      const c2End = toScreen({ x: spanCoeff2 * spanV2.x, y: spanCoeff2 * spanV2.y })
+      ctx.beginPath(); ctx.moveTo(c2End.x, c2End.y); ctx.lineTo(combScr.x, combScr.y); ctx.stroke()
+      ctx.setLineDash([])
+
+      drawVector(comb, '#f8c040', `${spanCoeff1.toFixed(1)}v₁+${spanCoeff2.toFixed(1)}v₂`, 2.5)
+
+      // Draggable endpoints for v1, v2
+      ;[{ v: spanV1, c: '#4f8' }, { v: spanV2, c: '#4fc8ff' }].forEach(({ v, c }) => {
+        const p = toScreen(v)
+        ctx.fillStyle = c
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, 7, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+      })
+
+      const det = spanV1.x * spanV2.y - spanV1.y * spanV2.x
+      infoPanel.innerHTML = `
+        Span of v₁ and v₂: <span class="value">${Math.abs(det) > 0.01 ? 'Fills ℝ²' : 'Line (linearly dependent)'}</span><br>
+        det([v₁ v₂]) = <span class="value">${det.toFixed(2)}</span>  
+        = area of parallelogram<br>
+        Combination: <span class="value">${spanCoeff1.toFixed(1)}</span>·v₁ + <span class="value">${spanCoeff2.toFixed(1)}</span>·v₂
+      `
+      legendDiv.innerHTML = `
+        <span><span class="swatch" style="background:#4f8"></span> v₁</span>
+        <span><span class="swatch" style="background:#4fc8ff"></span> v₂</span>
+        <span><span class="swatch" style="background:#f8c040"></span> Linear combination</span>
+        <span><span class="swatch" style="background:rgba(79,255,136,0.2)"></span> Span region</span>
+      `
+    }
+
+    // ── Render dispatcher ─────────────────────────────────────────────
+    function render() {
+      if (currentTab === 'vectors') drawVectors()
+      else if (currentTab === 'matrix') drawMatrix()
+      else if (currentTab === 'span') drawSpan()
+    }
+
+    // ── Sidebar builder ───────────────────────────────────────────────
+    function buildSidebar() {
+      sidebarEl.innerHTML = ''
+
+      if (currentTab === 'vectors') {
+        sidebarEl.innerHTML = `
+          <h3>Vector Controls</h3>
+          <label>v = (x, y)</label>
+          <div class="row"><span>x</span><input type="range" id="vx" min="-4" max="4" step="0.1" value="${vecV.x}"><span id="vxVal">${vecV.x.toFixed(1)}</span></div>
+          <div class="row"><span>y</span><input type="range" id="vy" min="-4" max="4" step="0.1" value="${vecV.y}"><span id="vyVal">${vecV.y.toFixed(1)}</span></div>
+          <label>u = (x, y)</label>
+          <div class="row"><span>x</span><input type="range" id="ux" min="-4" max="4" step="0.1" value="${vecU.x}"><span id="uxVal">${vecU.x.toFixed(1)}</span></div>
+          <div class="row"><span>y</span><input type="range" id="uy" min="-4" max="4" step="0.1" value="${vecU.y}"><span id="uyVal">${vecU.y.toFixed(1)}</span></div>
+          <button id="toggleSum" class="${vecShowSum ? 'active' : ''}">Show Sum v+u</button>
+          <button id="toggleScalar">Scalar {vShowScalar ? 'ON' : 'OFF'}</button>
+          <button id="resetVecs">↺ Reset</button>
+        `
+        // Wire events
+        ;[
+          { id: 'vx', get: () => vecV.x, set: v => { vecV.x = v }, valId: 'vxVal' },
+          { id: 'vy', get: () => vecV.y, set: v => { vecV.y = v }, valId: 'vyVal' },
+          { id: 'ux', get: () => vecU.x, set: v => { vecU.x = v }, valId: 'uxVal' },
+          { id: 'uy', get: () => vecU.y, set: v => { vecU.y = v }, valId: 'uyVal' },
+        ].forEach(({ id, set, valId }) => {
+          const inp = document.getElementById(id)
+          if (!inp) return
+          inp.addEventListener('input', () => {
+            const val = Number(inp.value)
+            set(val)
+            document.getElementById(valId).textContent = val.toFixed(1)
+          })
+        })
+
+        document.getElementById('toggleSum')?.addEventListener('click', function() {
+          vecShowSum = !vecShowSum
+          this.classList.toggle('active', vecShowSum)
+          this.textContent = vecShowSum ? 'Hide Sum' : 'Show Sum v+u'
+        })
+
+        document.getElementById('toggleScalar')?.addEventListener('click', function() {
+          vecShowScalar = !vecShowScalar
+          this.textContent = `Scalar ${vecShowScalar ? 'ON' : 'OFF'}`
+          buildSidebar()
+        })
+
+        if (vecShowScalar) {
+          const row = document.createElement('div')
+          row.className = 'row'
+          row.innerHTML = `<span>k</span><input type="range" id="scalarK" min="-2" max="3" step="0.1" value="${vecScalar}"><span id="scalarVal">${vecScalar.toFixed(1)}</span>`
+          sidebarEl.appendChild(row)
+          document.getElementById('scalarK')?.addEventListener('input', function() {
+            vecScalar = Number(this.value)
+            document.getElementById('scalarVal').textContent = vecScalar.toFixed(1)
+          })
+        }
+
+        document.getElementById('resetVecs')?.addEventListener('click', () => {
+          vecV = { x: 3, y: 2 }
+          vecU = { x: -1.5, y: 2.5 }
+          vecShowSum = true
+          vecShowScalar = false
+          buildSidebar()
+        })
+      }
+
+      if (currentTab === 'matrix') {
+        sidebarEl.innerHTML = `
+          <h3>2×2 Matrix</h3>
+          <label>[[a, b], [c, d]]</label>
+          <div class="matrix-input">
+            <input type="number" id="ma" value="${matA}" step="0.1">
+            <input type="number" id="mb" value="${matB}" step="0.1">
+            <input type="number" id="mc" value="${matC}" step="0.1">
+            <input type="number" id="md" value="${matD}" step="0.1">
+          </div>
+          <button id="resetMat">↺ Identity</button>
+          <button id="rot30">↻ Rot 30°</button>
+          <button id="shear">Shear</button>
+          <button id="det2">det=2 (scale)</button>
+          <p style="color:#666;font-size:11px;margin:0">Enter values or use presets</p>
+        `
+        ;['ma','mb','mc','md'].forEach(id => {
+          document.getElementById(id)?.addEventListener('input', () => {
+            matA = Number(document.getElementById('ma')?.value || matA)
+            matB = Number(document.getElementById('mb')?.value || matB)
+            matC = Number(document.getElementById('mc')?.value || matC)
+            matD = Number(document.getElementById('md')?.value || matD)
+          })
+        })
+
+        document.getElementById('resetMat')?.addEventListener('click', () => {
+          matA = 1; matB = 0; matC = 0; matD = 1
+          document.getElementById('ma').value = 1
+          document.getElementById('mb').value = 0
+          document.getElementById('mc').value = 0
+          document.getElementById('md').value = 1
+        })
+        document.getElementById('rot30')?.addEventListener('click', () => {
+          const cos = Math.cos(Math.PI/6), sin = Math.sin(Math.PI/6)
+          matA = cos; matB = -sin; matC = sin; matD = cos
+          document.getElementById('ma').value = cos.toFixed(2)
+          document.getElementById('mb').value = (-sin).toFixed(2)
+          document.getElementById('mc').value = sin.toFixed(2)
+          document.getElementById('md').value = cos.toFixed(2)
+        })
+        document.getElementById('shear')?.addEventListener('click', () => {
+          matA = 1; matB = 1; matC = 0; matD = 1
+          document.getElementById('ma').value = 1
+          document.getElementById('mb').value = 1
+          document.getElementById('mc').value = 0
+          document.getElementById('md').value = 1
+        })
+        document.getElementById('det2')?.addEventListener('click', () => {
+          matA = 2; matB = 0; matC = 0; matD = 1
+          document.getElementById('ma').value = 2
+          document.getElementById('mb').value = 0
+          document.getElementById('mc').value = 0
+          document.getElementById('md').value = 1
+        })
+
+        if (!gridPts.length) buildGridPts()
+      }
+
+      if (currentTab === 'span') {
+        sidebarEl.innerHTML = `
+          <h3>Span Controls</h3>
+          <label>v₁</label>
+          <div class="row"><span>x</span><input type="range" id="sv1x" min="-4" max="4" step="0.1" value="${spanV1.x}"><span id="sv1xv">${spanV1.x.toFixed(1)}</span></div>
+          <div class="row"><span>y</span><input type="range" id="sv1y" min="-4" max="4" step="0.1" value="${spanV1.y}"><span id="sv1yv">${spanV1.y.toFixed(1)}</span></div>
+          <label>v₂</label>
+          <div class="row"><span>x</span><input type="range" id="sv2x" min="-4" max="4" step="0.1" value="${spanV2.x}"><span id="sv2xv">${spanV2.x.toFixed(1)}</span></div>
+          <div class="row"><span>y</span><input type="range" id="sv2y" min="-4" max="4" step="0.1" value="${spanV2.y}"><span id="sv2yv">${spanV2.y.toFixed(1)}</span></div>
+          <label>Coefficients</label>
+          <div class="row"><span>c₁</span><input type="range" id="sc1" min="-3" max="3" step="0.05" value="${spanCoeff1}"><span id="sc1v">${spanCoeff1.toFixed(1)}</span></div>
+          <div class="row"><span>c₂</span><input type="range" id="sc2" min="-3" max="3" step="0.05" value="${spanCoeff2}"><span id="sc2v">${spanCoeff2.toFixed(1)}</span></div>
+          <button id="togFill" class="${spanShowFill ? 'active' : ''}">Show Span Fill</button>
+          <button id="resetSpan">↺ Reset</button>
+        `
+        ;[
+          { id: 'sv1x', set: v => { spanV1.x = v }, vid: 'sv1xv' },
+          { id: 'sv1y', set: v => { spanV1.y = v }, vid: 'sv1yv' },
+          { id: 'sv2x', set: v => { spanV2.x = v }, vid: 'sv2xv' },
+          { id: 'sv2y', set: v => { spanV2.y = v }, vid: 'sv2yv' },
+          { id: 'sc1', set: v => { spanCoeff1 = v }, vid: 'sc1v' },
+          { id: 'sc2', set: v => { spanCoeff2 = v }, vid: 'sc2v' },
+        ].forEach(({ id, set, vid }) => {
+          document.getElementById(id)?.addEventListener('input', function() {
+            const val = Number(this.value)
+            set(val)
+            document.getElementById(vid).textContent = val.toFixed(2)
+          })
+        })
+        document.getElementById('togFill')?.addEventListener('click', function() {
+          spanShowFill = !spanShowFill
+          this.classList.toggle('active', spanShowFill)
+        })
+        document.getElementById('resetSpan')?.addEventListener('click', () => {
+          spanV1 = { x: 2, y: 1 }
+          spanV2 = { x: -1, y: 2 }
+          spanCoeff1 = 1
+          spanCoeff2 = 0.7
+          buildSidebar()
+        })
+      }
+    }
+
+    // ── Vector drag (for vectors and span tabs) ───────────────────────
+    canvas.addEventListener('mousedown', (e) => {
+      if (currentTab !== 'vectors' && currentTab !== 'span') return
+      const rect = canvas.getBoundingClientRect()
+      const sx = e.clientX - rect.left
+      const sy = e.clientY - rect.top
+      const w = toWorld({ x: sx, y: sy })
+
+      const targets = currentTab === 'vectors'
+        ? [{ v: vecV, id: 'v' }, { v: vecU, id: 'u' }]
+        : [{ v: spanV1, id: 'v1' }, { v: spanV2, id: 'v2' }]
+
+      const threshold = 0.4
+      for (const { v, id } of targets) {
+        const dist = Math.hypot(w.x - v.x, w.y - v.y)
+        if (dist < threshold) {
+          dragVec = id
+          break
+        }
+      }
+    })
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!dragVec) return
+      const rect = canvas.getBoundingClientRect()
+      const w = toWorld({ x: e.clientX - rect.left, y: e.clientY - rect.top })
+      const v = { x: Math.round(w.x * 10) / 10, y: Math.round(w.y * 10) / 10 }
+
+      if (currentTab === 'vectors') {
+        if (dragVec === 'v') vecV = v
+        else vecU = v
+      } else if (currentTab === 'span') {
+        if (dragVec === 'v1') spanV1 = v
+        else spanV2 = v
+      }
+      buildSidebar()
+    })
+
+    canvas.addEventListener('mouseup', () => { dragVec = null })
+    canvas.addEventListener('mouseleave', () => { dragVec = null })
+
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+      if (currentTab !== 'vectors' && currentTab !== 'span') return
+      const rect = canvas.getBoundingClientRect()
+      const sx = e.touches[0].clientX - rect.left
+      const sy = e.touches[0].clientY - rect.top
+      const w = toWorld({ x: sx, y: sy })
+      const targets = currentTab === 'vectors'
+        ? [{ v: vecV, id: 'v' }, { v: vecU, id: 'u' }]
+        : [{ v: spanV1, id: 'v1' }, { v: spanV2, id: 'v2' }]
+      for (const { v, id } of targets) {
+        if (Math.hypot(w.x - v.x, w.y - v.y) < 0.5) { dragVec = id; e.preventDefault(); break }
+      }
+    }, { passive: false })
+    canvas.addEventListener('touchmove', (e) => {
+      if (!dragVec) return
+      const rect = canvas.getBoundingClientRect()
+      const w = toWorld({ x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top })
+      const v = { x: Math.round(w.x * 10) / 10, y: Math.round(w.y * 10) / 10 }
+      if (currentTab === 'vectors') {
+        if (dragVec === 'v') vecV = v; else vecU = v
+      } else {
+        if (dragVec === 'v1') spanV1 = v; else spanV2 = v
+      }
+      buildSidebar()
+    })
+    canvas.addEventListener('touchend', () => { dragVec = null })
+
+    // ── Tab switching ─────────────────────────────────────────────────
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentTab = btn.dataset.tab
+        tabButtons.forEach(b => b.classList.remove('active'))
+        btn.classList.add('active')
+        if (currentTab === 'matrix') buildGridPts()
+        buildSidebar()
+        render()
+      })
+    })
+
+    // ── Animation loop ────────────────────────────────────────────────
+    function tick() {
+      render()
+      requestAnimationFrame(tick)
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────
+    function resize() {
+      const stage = canvas.parentElement
+      canvas.width = W = stage.clientWidth
+      canvas.height = H = stage.clientHeight
+      if (currentTab === 'matrix') buildGridPts()
+      render()
+    }
+
+    window.addEventListener('resize', resize)
+    resize()
+    buildSidebar()
+    requestAnimationFrame(tick)
+
+    console.log('%c🔢 Linear Algebra%c | vectors, matrix transform, span', 'color:#4f8', '')
+    console.log('  Controls: tabs | sliders | draggable vectors | matrix input')
+    console.log('  Using @uploop/timeline easing & @uploop/compositor blendModes')
+  </script>
+</body>
+</html>

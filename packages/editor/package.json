@@ -1,0 +1,21 @@
+{
+  "name": "@uploop/editor",
+  "version": "0.1.0",
+  "description": "Standalone uploop-vided editor — launchable via CLI to edit projects",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": { ".": { "import": "./src/index.js" } },
+  "files": ["src", "public"],
+  "scripts": { "test": "vitest", "dev": "vite" },
+  "dependencies": {
+    "@uploop/timeline": "workspace:*",
+    "@uploop/compositor": "workspace:*",
+    "@uploop/project": "workspace:*",
+    "@uploop/vided-ui": "workspace:*",
+    "@uploop/media": "workspace:*",
+    "@uploop/output": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0"
+  }
+}

@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Playlist Player — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      gap: 20px;
+      padding: 24px;
+    }
+    .player {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .video-card {
+      background: #151520;
+      border-radius: 12px;
+      overflow: hidden;
+      width: min(560px, 90vw);
+    }
+    video {
+      width: 100%;
+      display: block;
+      background: #000;
+    }
+    .now-playing {
+      padding: 12px 16px;
+      font-size: 14px;
+      color: #aaa;
+    }
+    .now-playing strong { color: #4f8; }
+    .progress-bar {
+      height: 4px;
+      background: #222;
+      position: relative;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #4f8;
+      width: 0%;
+      transition: width 0.1s linear;
+    }
+    .playlist {
+      background: #151520;
+      border-radius: 12px;
+      padding: 16px;
+      width: min(280px, 90vw);
+      max-height: 420px;
+      overflow-y: auto;
+    }
+    .playlist h3 {
+      font-size: 15px;
+      margin-bottom: 12px;
+      color: #aaa;
+    }
+    .queue-item {
+      padding: 10px 12px;
+      border-radius: 6px;
+      margin-bottom: 6px;
+      font-size: 13px;
+      cursor: default;
+      transition: background 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .queue-item.active {
+      background: #1e2e1e;
+      color: #4f8;
+      font-weight: 600;
+    }
+    .queue-item.played { color: #555; }
+    .queue-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #222;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+    }
+    .queue-item.active .queue-num { background: #2a4a2a; }
+    .controls-row {
+      display: flex;
+      gap: 8px;
+      padding: 12px 16px;
+    }
+    .controls-row button {
+      background: #1a1a28;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 6px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: background 0.2s;
+    }
+    .controls-row button:hover { background: #1e1e30; }
+    .info {
+      font-size: 13px;
+      color: #666;
+    }
+    .info code { color: #4f8; }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href=".." class="back">← Examples</a>
+  <div class="player">
+    <div class="video-card">
+      <video id="video-el" muted playsinline></video>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+      <div class="now-playing" id="now-playing">Ready</div>
+      <div class="controls-row">
+        <button id="btn-prev">⏮ Prev</button>
+        <button id="btn-play">▶ Play</button>
+        <button id="btn-next">⏭ Next</button>
+      </div>
+    </div>
+    <div class="playlist">
+      <h3>📋 Playlist Queue</h3>
+      <div id="queue"></div>
+    </div>
+  </div>
+  <div class="info">
+    Using <code>createTransition</code> (@uploop/compositor) + <code>Clip</code>/<code>Track</code> (@uploop/timeline)
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image Gallery — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .stage {
+      position: relative;
+      width: min(800px, 90vw);
+      aspect-ratio: 16 / 10;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #151520;
+    }
+    .slide {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: none;
+    }
+    .slide img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .nav {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      align-items: center;
+    }
+    button {
+      padding: 10px 20px;
+      background: #1a1a2e;
+      color: #ccc;
+      border: 1px solid #333;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    button:hover { background: #252540; color: #fff; }
+    button.active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .counter {
+      font-size: 13px;
+      color: #888;
+      min-width: 60px;
+      text-align: center;
+    }
+    .dots {
+      display: flex;
+      gap: 6px;
+      margin-top: 12px;
+    }
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #333;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .dot.active { background: #4f8; }
+    .info {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #666;
+    }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href=".." class="back">← Examples</a>
+  <div class="stage" id="stage"></div>
+  <div class="nav">
+    <button id="prev-btn">← Prev</button>
+    <span class="counter" id="counter">1 / 8</span>
+    <button id="next-btn">Next →</button>
+    <button id="autoplay-btn">▶ Auto</button>
+  </div>
+  <div class="dots" id="dots"></div>
+  <div class="info">
+    Using <code>createTransition</code> from <code>@uploop/compositor</code>
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

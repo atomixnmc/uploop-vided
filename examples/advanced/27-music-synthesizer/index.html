@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Music Synthesizer — uploop-vided</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                background: #0a0a0f;
+                color: #e0e0e0;
+                font-family: system-ui, sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-height: 100vh;
+                padding: 24px;
+                gap: 16px;
+            }
+            .back {
+                position: fixed;
+                top: 16px;
+                left: 16px;
+                z-index: 10;
+                color: #888;
+                text-decoration: none;
+                font-size: 14px;
+            }
+            .back:hover {
+                color: #fff;
+            }
+            .title-bar {
+                background: #151520;
+                padding: 10px 24px;
+                border-radius: 12px;
+                font-size: 15px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                border: 1px solid #252535;
+            }
+            .main-grid {
+                display: flex;
+                gap: 20px;
+                width: 100%;
+                max-width: 1100px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .viz-section {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+            canvas {
+                background: #151520;
+                border-radius: 12px;
+                border: 1px solid #252535;
+                display: block;
+            }
+            .keyboard {
+                display: flex;
+                gap: 2px;
+                justify-content: center;
+                user-select: none;
+            }
+            .key {
+                width: 36px;
+                height: 120px;
+                background: linear-gradient(180deg, #2a2a3a 0%, #1a1a2a 100%);
+                border: 1px solid #333;
+                border-radius: 0 0 6px 6px;
+                cursor: pointer;
+                display: flex;
+                align-items: flex-end;
+                justify-content: center;
+                padding-bottom: 6px;
+                font-size: 10px;
+                color: #666;
+                transition: all 0.05s;
+            }
+            .key:hover {
+                background: #2a2a4a;
+            }
+            .key.black {
+                width: 28px;
+                height: 80px;
+                background: linear-gradient(180deg, #111 0%, #000 100%);
+                margin: 0 -14px;
+                z-index: 2;
+                border-radius: 0 0 4px 4px;
+                color: #444;
+                font-size: 9px;
+                padding-bottom: 4px;
+            }
+            .key.active {
+                background: #4f8 !important;
+                color: #0a0a0f !important;
+            }
+            .controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 12px;
+                justify-content: center;
+                max-width: 1000px;
+            }
+            .control-card {
+                background: #151520;
+                border: 1px solid #252535;
+                border-radius: 10px;
+                padding: 14px 18px;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                min-width: 130px;
+            }
+            .control-card h4 {
+                font-size: 13px;
+                color: #888;
+            }
+            .wave-select {
+                display: flex;
+                gap: 4px;
+            }
+            .wave-select button {
+                background: #1e1e30;
+                color: #e0e0e0;
+                border: 1px solid #333;
+                padding: 6px 12px;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 11px;
+            }
+            .wave-select button:hover {
+                background: #2a2a40;
+            }
+            .wave-select button.active {
+                background: #2a3a2a;
+                border-color: #4f8;
+                color: #4f8;
+            }
+            .control-card input[type="range"] {
+                accent-color: #4f8;
+                width: 100px;
+            }
+            .control-card label {
+                font-size: 11px;
+                color: #999;
+            }
+            .info-box {
+                background: #0f0f1a;
+                border: 1px solid #252535;
+                border-radius: 8px;
+                padding: 12px 18px;
+                font-size: 12px;
+                color: #aaa;
+                max-width: 500px;
+                text-align: center;
+                line-height: 1.6;
+            }
+            .info-box code {
+                color: #4f8;
+            }
+        </style>
+    </head>
+    <body>
+        <a href="../.." class="back">← Examples</a>
+        <div class="title-bar">🎹 Music Synthesizer · Web Audio API</div>
+
+        <div class="main-grid">
+            <div class="viz-section">
+                <canvas id="wave-canvas" width="500" height="160"></canvas>
+                <canvas id="fft-canvas" width="500" height="200"></canvas>
+            </div>
+        </div>
+
+        <div class="keyboard" id="keyboard"></div>
+
+        <div class="controls">
+            <div class="control-card">
+                <h4>Waveform</h4>
+                <div class="wave-select" id="wave-btns">
+                    <button data-wave="sine" class="active">Sine</button>
+                    <button data-wave="square">Square</button>
+                    <button data-wave="sawtooth">Saw</button>
+                    <button data-wave="triangle">Tri</button>
+                </div>
+            </div>
+            <div class="control-card">
+                <h4>Attack</h4>
+                <input type="range" id="attack" min="0" max="100" value="10" />
+                <label>10 ms</label>
+            </div>
+            <div class="control-card">
+                <h4>Decay</h4>
+                <input type="range" id="decay" min="0" max="100" value="20" />
+                <label>20 ms</label>
+            </div>
+            <div class="control-card">
+                <h4>Sustain</h4>
+                <input type="range" id="sustain" min="0" max="100" value="70" />
+                <label>0.70</label>
+            </div>
+            <div class="control-card">
+                <h4>Release</h4>
+                <input type="range" id="release" min="0" max="200" value="50" />
+                <label>50 ms</label>
+            </div>
+        </div>
+
+        <div class="info-box">
+            <strong>ADSR Envelope</strong> — Attack, Decay, Sustain, Release
+            shape the sound's volume over time. Sine waves are pure tones with
+            no harmonics; sawtooth contains all harmonics, square contains odd
+            harmonics.<br />
+            <code>import { easing } from '@uploop/timeline'</code> — used for
+            envelope curve smoothing
+        </div>
+
+        <script type="module">
+            import { easing } from "@uploop/timeline";
+            import { blendModes } from "@uploop/compositor";
+
+            // ── Audio context ──────────────────────────────────────────────────
+            let audioCtx = null;
+            let masterGain = null;
+            let analyser = null;
+            let activeOsc = null;
+            let activeGain = null;
+            let waveform = "sine";
+
+            function initAudio() {
+                if (audioCtx) return;
+                audioCtx = new (
+                    window.AudioContext || window.webkitAudioContext
+                )();
+                masterGain = audioCtx.createGain();
+                masterGain.gain.value = 0.3;
+                masterGain.connect(audioCtx.destination);
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 2048;
+                analyser.connect(masterGain);
+            }
+
+            // ── ADSR ──────────────────────────────────────────────────────────
+            function getADSR() {
+                return {
+                    attack:
+                        Number(document.getElementById("attack").value) / 1000,
+                    decay:
+                        Number(document.getElementById("decay").value) / 1000,
+                    sustain:
+                        Number(document.getElementById("sustain").value) / 100,
+                    release:
+                        Number(document.getElementById("release").value) / 1000,
+                };
+            }
+
+            function playNote(freq) {
+                initAudio();
+                stopNote();
+                const adsr = getADSR();
+                const now = audioCtx.currentTime;
+
+                const osc = audioCtx.createOscillator();
+                osc.type = waveform;
+                osc.frequency.setValueAtTime(freq, now);
+
+                const gainNode = audioCtx.createGain();
+                gainNode.gain.setValueAtTime(0, now);
+                // Attack with easing
+                gainNode.gain.linearRampToValueAtTime(1, now + adsr.attack);
+                // Decay to sustain
+                gainNode.gain.linearRampToValueAtTime(
+                    adsr.sustain,
+                    now + adsr.attack + adsr.decay,
+                );
+
+                osc.connect(gainNode);
+                gainNode.connect(analyser);
+
+                osc.start(now);
+                activeOsc = osc;
+                activeGain = gainNode;
+            }
+
+            function stopNote() {
+                if (activeOsc && activeGain) {
+                    const adsr = getADSR();
+                    const now = audioCtx.currentTime;
+                    activeGain.gain.cancelScheduledValues(now);
+                    activeGain.gain.setValueAtTime(activeGain.gain.value, now);
+                    activeGain.gain.exponentialRampToValueAtTime(
+                        0.001,
+                        now + adsr.release,
+                    );
+                    activeOsc.stop(now + adsr.release + 0.05);
+                    activeOsc = null;
+                    activeGain = null;
+                }
+            }
+
+            // ── Keyboard ──────────────────────────────────────────────────────
+            const noteNames = [
+                "C",
+                "C#",
+                "D",
+                "D#",
+                "E",
+                "F",
+                "F#",
+                "G",
+                "G#",
+                "A",
+                "A#",
+                "B",
+            ];
+            // Build 2 octaves: C4 to B5
+            const keys = [];
+            for (let octave = 4; octave <= 5; octave++) {
+                for (let n = 0; n < 12; n++) {
+                    const isBlack = noteNames[n].includes("#");
+                    const midiNote = (octave + 1) * 12 + n; // C4 = MIDI 60
+                    const freq = 440 * Math.pow(2, (midiNote - 69) / 12);
+                    keys.push({
+                        name: noteNames[n] + octave,
+                        freq,
+                        isBlack,
+                        midiNote,
+                    });
+                }
+            }
+            keys.push({
+                name: "C6",
+                freq: 1046.5,
+                isBlack: false,
+                midiNote: 72,
+            });
+
+            const keyboardEl = document.getElementById("keyboard");
+            // Draw piano keys
+            let whiteIndex = 0;
+            for (const key of keys) {
+                const el = document.createElement("div");
+                el.className = "key" + (key.isBlack ? " black" : "");
+                el.dataset.freq = key.freq;
+                el.textContent = key.name;
+                el.addEventListener("mousedown", (e) => {
+                    e.preventDefault();
+                    const f = parseFloat(el.dataset.freq);
+                    playNote(f);
+                    el.classList.add("active");
+                });
+                el.addEventListener("mouseup", () => {
+                    stopNote();
+                    el.classList.remove("active");
+                });
+                el.addEventListener("mouseleave", () => {
+                    el.classList.remove("active");
+                });
+                // Touch support
+                el.addEventListener("touchstart", (e) => {
+                    e.preventDefault();
+                    const f = parseFloat(el.dataset.freq);
+                    playNote(f);
+                    el.classList.add("active");
+                });
+                el.addEventListener("touchend", () => {
+                    stopNote();
+                    el.classList.remove("active");
+                });
+                keyboardEl.appendChild(el);
+                whiteIndex++;
+            }
+
+            // ── Waveform selector ─────────────────────────────────────────────
+            document.querySelectorAll("#wave-btns button").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    waveform = btn.dataset.wave;
+                    document
+                        .querySelectorAll("#wave-btns button")
+                        .forEach((b) => b.classList.remove("active"));
+                    btn.classList.add("active");
+                });
+            });
+
+            // ── ADSR slider labels ────────────────────────────────────────────
+            document
+                .getElementById("attack")
+                .addEventListener("input", function () {
+                    this.nextElementSibling.textContent = this.value + " ms";
+                });
+            document
+                .getElementById("decay")
+                .addEventListener("input", function () {
+                    this.nextElementSibling.textContent = this.value + " ms";
+                });
+            document
+                .getElementById("sustain")
+                .addEventListener("input", function () {
+                    this.nextElementSibling.textContent = (
+                        this.value / 100
+                    ).toFixed(2);
+                });
+            document
+                .getElementById("release")
+                .addEventListener("input", function () {
+                    this.nextElementSibling.textContent = this.value + " ms";
+                });
+
+            // ── Waveform canvas ───────────────────────────────────────────────
+            const waveCanvas = document.getElementById("wave-canvas");
+            const waveCtx = waveCanvas.getContext("2d");
+
+            function drawWaveform() {
+                const w = waveCanvas.width;
+                const h = waveCanvas.height;
+                waveCtx.clearRect(0, 0, w, h);
+
+                // Grid
+                waveCtx.strokeStyle = "#1a1a2a";
+                waveCtx.lineWidth = 1;
+                for (let i = 1; i < 8; i++) {
+                    const y = (h / 8) * i;
+                    waveCtx.beginPath();
+                    waveCtx.moveTo(0, y);
+                    waveCtx.lineTo(w, y);
+                    waveCtx.stroke();
+                }
+
+                // Draw waveform shape based on selected type
+                waveCtx.strokeStyle = "#4f8";
+                waveCtx.lineWidth = 2;
+                waveCtx.beginPath();
+                const midY = h / 2;
+                const amp = h * 0.4;
+
+                for (let x = 0; x < w; x++) {
+                    const phase = (x / w) * Math.PI * 2;
+                    let y;
+                    switch (waveform) {
+                        case "sine":
+                            y = Math.sin(phase);
+                            break;
+                        case "square":
+                            y = Math.sin(phase) >= 0 ? 1 : -1;
+                            break;
+                        case "sawtooth":
+                            y =
+                                1 -
+                                2 * ((phase % (Math.PI * 2)) / (Math.PI * 2));
+                            break;
+                        case "triangle": {
+                            const p = (phase % (Math.PI * 2)) / (Math.PI * 2);
+                            y =
+                                p < 0.25
+                                    ? p * 4
+                                    : p < 0.75
+                                      ? 2 - p * 4
+                                      : p * 4 - 4;
+                            break;
+                        }
+                        default:
+                            y = Math.sin(phase);
+                    }
+                    const py = midY - y * amp;
+                    if (x === 0) waveCtx.moveTo(x, py);
+                    else waveCtx.lineTo(x, py);
+                }
+                waveCtx.stroke();
+
+                // Labels
+                waveCtx.fillStyle = "#888";
+                waveCtx.font = "11px system-ui";
+                waveCtx.textAlign = "left";
+                waveCtx.fillText(
+                    "Waveform: " +
+                        waveform.charAt(0).toUpperCase() +
+                        waveform.slice(1),
+                    10,
+                    22,
+                );
+            }
+
+            // ── FFT canvas ────────────────────────────────────────────────────
+            const fftCanvas = document.getElementById("fft-canvas");
+            const fftCtx = fftCanvas.getContext("2d");
+
+            function drawFFT() {
+                const w = fftCanvas.width;
+                const h = fftCanvas.height;
+                fftCtx.clearRect(0, 0, w, h);
+
+                // Background grid
+                fftCtx.strokeStyle = "#1a1a2a";
+                fftCtx.lineWidth = 1;
+                for (let i = 1; i < 8; i++) {
+                    const y = (h / 8) * i;
+                    fftCtx.beginPath();
+                    fftCtx.moveTo(0, y);
+                    fftCtx.lineTo(w, y);
+                    fftCtx.stroke();
+                }
+
+                if (!analyser) {
+                    fftCtx.fillStyle = "#888";
+                    fftCtx.font = "14px system-ui";
+                    fftCtx.textAlign = "center";
+                    fftCtx.fillText("Click a key to start audio", w / 2, h / 2);
+                    return;
+                }
+
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                analyser.getByteFrequencyData(dataArray);
+
+                const barWidth = w / bufferLength;
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = (dataArray[i] / 255) * h;
+                    const hue = (i / bufferLength) * 360;
+                    fftCtx.fillStyle = `hsla(${hue}, 80%, 50%, 0.8)`;
+                    fftCtx.fillRect(
+                        i * barWidth,
+                        h - barHeight,
+                        barWidth,
+                        barHeight,
+                    );
+                }
+
+                // Frequency labels
+                fftCtx.fillStyle = "#888";
+                fftCtx.font = "10px system-ui";
+                fftCtx.textAlign = "center";
+                const freqs = [100, 500, 1000, 5000, 10000];
+                for (const f of freqs) {
+                    const idx = Math.round(
+                        (f / (audioCtx.sampleRate / 2)) * bufferLength,
+                    );
+                    fftCtx.fillText(`${f}Hz`, idx * barWidth, h - 4);
+                }
+
+                // Title
+                fftCtx.fillStyle = "#888";
+                fftCtx.font = "11px system-ui";
+                fftCtx.textAlign = "left";
+                fftCtx.fillText("Frequency Spectrum (FFT)", 10, 20);
+            }
+
+            // ── ADSR envelope visualization on FFT canvas bottom ──────────────
+
+            // ── Global keyboard ───────────────────────────────────────────────
+            window.addEventListener("keydown", (e) => {
+                if (e.repeat) return;
+                const keyMap = {
+                    a: 0,
+                    w: 1,
+                    s: 2,
+                    e: 3,
+                    d: 4,
+                    f: 5,
+                    t: 6,
+                    g: 7,
+                    y: 8,
+                    h: 9,
+                    u: 10,
+                    j: 11,
+                    k: 12,
+                    o: 13,
+                    l: 14,
+                    p: 15,
+                    ";": 16,
+                    "'": 17,
+                };
+                const idx = keyMap[e.key.toLowerCase()];
+                if (idx !== undefined && idx < keys.length) {
+                    const keyEl = keyboardEl.children[idx];
+                    keyEl.classList.add("active");
+                    playNote(keys[idx].freq);
+                }
+            });
+            window.addEventListener("keyup", (e) => {
+                const keyMap = {
+                    a: 0,
+                    w: 1,
+                    s: 2,
+                    e: 3,
+                    d: 4,
+                    f: 5,
+                    t: 6,
+                    g: 7,
+                    y: 8,
+                    h: 9,
+                    u: 10,
+                    j: 11,
+                    k: 12,
+                    o: 13,
+                    l: 14,
+                    p: 15,
+                    ";": 16,
+                    "'": 17,
+                };
+                const idx = keyMap[e.key.toLowerCase()];
+                if (idx !== undefined && idx < keys.length) {
+                    keyboardEl.children[idx].classList.remove("active");
+                    stopNote();
+                }
+            });
+
+            // ── Loop ──────────────────────────────────────────────────────────
+            function loop() {
+                drawWaveform();
+                drawFFT();
+                requestAnimationFrame(loop);
+            }
+            loop();
+
+            console.log(
+                "%c🎹 Music Synthesizer%c | Web Audio API with ADSR envelope",
+                "color:#4f8",
+                "",
+            );
+            console.log(
+                "  Click piano keys or use keyboard: A-K map to white keys, W-P map to black keys",
+            );
+        </script>
+    </body>
+</html>

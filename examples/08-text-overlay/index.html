@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Text Overlay — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .stage {
+      position: relative;
+      width: min(800px, 90vw);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+    }
+    video {
+      display: block;
+      width: 100%;
+      border-radius: 12px;
+    }
+    .overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      padding: 40px;
+    }
+    .title {
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: #fff;
+      text-shadow: 0 2px 12px rgba(0,0,0,0.7);
+      opacity: 0;
+      transition: none;
+    }
+    .subtitle {
+      font-size: clamp(1rem, 2.5vw, 1.4rem);
+      font-weight: 400;
+      color: #ccc;
+      text-shadow: 0 1px 8px rgba(0,0,0,0.6);
+      margin-top: 8px;
+      opacity: 0;
+      transition: none;
+    }
+    .timeline-bar {
+      width: min(800px, 90vw);
+      height: 4px;
+      background: #1a1a2e;
+      border-radius: 2px;
+      margin-top: 16px;
+      overflow: hidden;
+    }
+    .timeline-progress {
+      height: 100%;
+      background: #4f8;
+      border-radius: 2px;
+      width: 0%;
+      transition: none;
+    }
+    .info {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #666;
+    }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href=".." class="back">← Examples</a>
+  <div class="stage">
+    <video
+      id="video"
+      src="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4"
+      muted loop playsinline
+    ></video>
+    <div class="overlay">
+      <div class="title" id="title-el">Big Buck Bunny</div>
+      <div class="subtitle" id="subtitle-el">An Uploop Production</div>
+    </div>
+  </div>
+  <div class="timeline-bar">
+    <div class="timeline-progress" id="progress-bar"></div>
+  </div>
+  <div class="info">
+    Using <code>KeyframeTrack</code> from <code>@uploop/timeline</code> for text animation timing
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

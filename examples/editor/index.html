@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uploop Vided — Editor</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    /* ── Top Bar ──────────────────────────────────── */
+    .topbar {
+      display: flex; align-items: center; gap: 12px;
+      padding: 8px 16px; background: #111118;
+      border-bottom: 1px solid #222;
+      flex-shrink: 0;
+    }
+    .topbar h1 { font-size: 15px; font-weight: 600; }
+    .topbar .logo { color: #4f8; font-size: 18px; }
+    .topbar .ver { color: #555; font-size: 11px; }
+    .topbar .spacer { flex: 1; }
+    .topbar a { color: #888; text-decoration: none; font-size: 13px; }
+    .topbar a:hover { color: #fff; }
+    .topbar button {
+      padding: 5px 12px; border: 1px solid #333; border-radius: 4px;
+      background: #151520; color: #e0e0e0; cursor: pointer; font-size: 12px;
+      transition: background 0.15s;
+    }
+    .topbar button:hover { background: #1e1e30; }
+    .topbar button.accent { border-color: #2a5a2a; color: #4f8; }
+    .topbar button.accent:hover { background: #1a2a1a; }
+
+    /* ── Main Layout ─────────────────────────────── */
+    .main {
+      display: flex; flex: 1; min-height: 0;
+    }
+
+    /* ── Left Panel (Library + Examples) ────────── */
+    .left-panel {
+      width: 240px; flex-shrink: 0; background: #0d0d14;
+      border-right: 1px solid #222; display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .left-panel .section-title {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em;
+      color: #555; padding: 10px 12px 4px; font-weight: 600;
+    }
+    .left-panel .lib-wrap { flex: 1; overflow-y: auto; min-height: 0; }
+    .left-panel .examples-nav {
+      border-top: 1px solid #222; padding: 8px 12px;
+      max-height: 200px; overflow-y: auto;
+    }
+    .left-panel .examples-nav a {
+      display: block; padding: 4px 8px; color: #888; text-decoration: none;
+      font-size: 12px; border-radius: 4px; transition: all 0.15s;
+    }
+    .left-panel .examples-nav a:hover { color: #fff; background: #151520; }
+    .left-panel .examples-nav a.active { color: #4f8; background: #0a1a0a; }
+
+    /* ── Center (Preview + Timeline) ─────────────── */
+    .center {
+      flex: 1; display: flex; flex-direction: column; min-width: 0;
+    }
+    .preview-area {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      background: #06060a; min-height: 0; position: relative;
+    }
+    .preview-area .drop-zone {
+      color: #333; font-size: 14px; text-align: center;
+    }
+    .preview-area uploop-preview {
+      width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;
+    }
+    .timeline-area {
+      height: 180px; flex-shrink: 0; border-top: 1px solid #222;
+      background: #0d0d14; overflow: hidden;
+    }
+    .timeline-area uploop-timeline {
+      display: block; width: 100%; height: 100%;
+    }
+
+    /* ── Right Panel (Inspector) ─────────────────── */
+    .right-panel {
+      width: 260px; flex-shrink: 0; background: #0d0d14;
+      border-left: 1px solid #222; display: flex; flex-direction: column;
+      overflow-y: auto;
+    }
+    .right-panel .section-title { padding: 12px 12px 8px; }
+
+    /* ── Status Bar ──────────────────────────────── */
+    .statusbar {
+      display: flex; align-items: center; gap: 16px;
+      padding: 4px 12px; background: #0a0a10; border-top: 1px solid #222;
+      font-size: 11px; color: #555; flex-shrink: 0;
+    }
+    .statusbar .stat { display: flex; align-items: center; gap: 4px; }
+    .statusbar .stat .label { color: #444; }
+    .statusbar .stat .val { color: #888; }
+  </style>
+</head>
+<body>
+
+  <!-- ── Top Bar ────────────────────────────────── -->
+  <div class="topbar">
+    <span class="logo">⬡</span>
+    <h1>uploop-vided</h1>
+    <span class="ver">v0.2-dev</span>
+    <span class="spacer"></span>
+    <button id="btn-play" class="accent">▶ Play</button>
+    <button id="btn-stop">⏹ Stop</button>
+    <button id="btn-export" title="Export via html-video">⬇ Export</button>
+    <a href="..">← Examples</a>
+  </div>
+
+  <!-- ── Main Layout ────────────────────────────── -->
+  <div class="main">
+
+    <!-- Left: Library + Examples Nav -->
+    <div class="left-panel">
+      <div class="section-title">Media Library</div>
+      <div class="lib-wrap">
+        <uploop-library id="library"></uploop-library>
+      </div>
+      <div class="examples-nav" id="examples-nav">
+        <div class="section-title">Examples</div>
+      </div>
+    </div>
+
+    <!-- Center: Preview + Timeline -->
+    <div class="center">
+      <div class="preview-area" id="preview-container">
+        <uploop-preview id="preview" width="640" height="360"></uploop-preview>
+        <div class="drop-zone" id="drop-zone">Drop media here or select from library →</div>
+      </div>
+      <div class="timeline-area">
+        <uploop-timeline id="timeline-ui"></uploop-timeline>
+      </div>
+    </div>
+
+    <!-- Right: Inspector -->
+    <div class="right-panel">
+      <div class="section-title">Inspector</div>
+      <uploop-inspector id="inspector"></uploop-inspector>
+    </div>
+
+  </div>
+
+  <!-- ── Status Bar ─────────────────────────────── -->
+  <div class="statusbar">
+    <div class="stat"><span class="label">Time:</span><span class="val" id="stat-time">0:00</span></div>
+    <div class="stat"><span class="label">FPS:</span><span class="val" id="stat-fps">30</span></div>
+    <div class="stat"><span class="label">Resolution:</span><span class="val">1920×1080</span></div>
+    <div class="stat"><span class="label">Tracks:</span><span class="val" id="stat-tracks">0</span></div>
+    <span class="spacer" style="flex:1"></span>
+    <span id="stat-msg">Ready</span>
+  </div>
+
+  <script type="module">
+    // ── Import all components (auto-register custom elements) ──
+    import '@uploop/vided-ui'
+    import { Timeline, Track, Clip } from '@uploop/timeline'
+    import { Compositor, Layer } from '@uploop/compositor'
+
+    // ── Build example navigation ──────────────────────────────
+    const examplesNav = document.getElementById('examples-nav')
+    const basicExamples = [
+      '01-slideshow', '02-multitrack-timeline', '03-video-transitions',
+      '04-audio-mixer', '05-keyframe-animation', '06-layer-compositor',
+      '07-blend-modes', '08-text-overlay', '09-picture-in-picture',
+      '10-image-gallery', '11-video-wall', '12-fade-transitions',
+      '13-wipe-transitions', '14-slide-transitions', '15-zoom-transitions',
+      '16-crossfade-audio', '17-playlist-player', '18-color-effects',
+      '19-split-screen', '20-final-composite',
+    ]
+    const advExamples = [
+      '21-calculus-visualization', '22-geometry-proofs', '23-linear-algebra',
+      '24-particle-simulation', '25-wave-propagation', '26-orbital-mechanics',
+      '27-music-synthesizer', '28-frequency-spectrum', '29-chemistry-molecules',
+      '30-history-timeline',
+    ]
+
+    function addExampleLinks(title, list, prefix) {
+      const div = document.createElement('div')
+      div.className = 'section-title'
+      div.style.cssText = 'font-size:10px;text-transform:uppercase;letter-spacing:0.08em;color:#555;padding:10px 12px 4px;font-weight:600'
+      div.textContent = title
+      examplesNav.appendChild(div)
+      for (const ex of list) {
+        const a = document.createElement('a')
+        a.href = prefix + ex + '/'
+        a.target = '_blank'
+        const num = ex.split('-')[0]
+        const name = ex.split('-').slice(1).map(w => w[0].toUpperCase() + w.slice(1)).join(' ')
+        a.textContent = `${num}. ${name}`
+        examplesNav.appendChild(a)
+      }
+    }
+    addExampleLinks('Basic', basicExamples, '../')
+    addExampleLinks('Advanced', advExamples, '../advanced/')
+
+    // ── Create demo timeline ──────────────────────────────────
+    const timeline = new Timeline({
+      id: 'demo',
+      name: 'Demo Project',
+      fps: 30,
+      width: 1920,
+      height: 1080,
+    })
+
+    // Video track with clips
+    const videoTrack = new Track({
+      id: 'track-video', type: 'video',
+      clips: [
+        new Clip({
+          id: 'clip-bbb', source: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4',
+          inPoint: 0, outPoint: 10, props: { opacity: 1, scale: 1, x: 0, y: 0 },
+        }),
+        new Clip({
+          id: 'clip-jellyfish', source: 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_2MB.mp4',
+          inPoint: 8, outPoint: 18, props: { opacity: 1, scale: 1, x: 0, y: 0 },
+        }),
+      ],
+    })
+
+    // Text overlay track
+    const textTrack = new Track({
+      id: 'track-text', type: 'text',
+      clips: [
+        new Clip({
+          id: 'clip-title', source: 'text:Demo Title',
+          inPoint: 1, outPoint: 8, props: { opacity: 0.9, x: 0, y: -200 },
+        }),
+        new Clip({
+          id: 'clip-subtitle', source: 'text:Powered by uploop-vided',
+          inPoint: 3, outPoint: 12, props: { opacity: 0.7, x: 0, y: 200 },
+        }),
+      ],
+    })
+
+    // Audio track
+    const audioTrack = new Track({
+      id: 'track-audio', type: 'audio',
+      clips: [
+        new Clip({
+          id: 'clip-synth', source: 'https://samplelib.com/lib/preview/mp3/sample-3s.mp3',
+          inPoint: 0, outPoint: 18, props: { volume: 0.6 },
+        }),
+      ],
+    })
+
+    timeline.addTrack(videoTrack)
+    timeline.addTrack(textTrack)
+    timeline.addTrack(audioTrack)
+
+    // ── Create compositor ─────────────────────────────────────
+    const compositor = new Compositor({
+      width: 1920, height: 1080,
+      layers: [
+        new Layer({ id: 'bg', name: 'Background', opacity: 0.3, visible: true }),
+      ],
+    })
+
+    // ── Wire components ──────────────────────────────────────
+    const timelineUI = document.getElementById('timeline-ui')
+    const preview = document.getElementById('preview')
+    const inspector = document.getElementById('inspector')
+    const library = document.getElementById('library')
+
+    // Bind timeline to UI
+    timelineUI.timeline = timeline
+    timelineUI.zoom = 60
+
+    // ── Playback state ────────────────────────────────────────
+    let playing = false
+    let currentTime = 0
+    let lastFrame = 0
+    let rafId = null
+
+    function updateStatus() {
+      const m = Math.floor(currentTime / 60)
+      const s = Math.floor(currentTime % 60)
+      document.getElementById('stat-time').textContent = `${m}:${String(s).padStart(2, '0')}`
+      document.getElementById('stat-tracks').textContent = timeline.tracks.length
+    }
+
+    function seek(time) {
+      currentTime = Math.max(0, Math.min(time, timeline.duration || 18))
+      timelineUI.currentTime = currentTime
+      preview.render(timeline, currentTime)
+      updateStatus()
+    }
+
+    function tick(now) {
+      if (!playing) return
+      const dt = lastFrame ? (now - lastFrame) / 1000 : 0
+      lastFrame = now
+      seek(currentTime + dt)
+      rafId = requestAnimationFrame(tick)
+    }
+
+    function play() {
+      if (playing) return
+      playing = true
+      lastFrame = 0
+      document.getElementById('btn-play').textContent = '⏸ Pause'
+      document.getElementById('stat-msg').textContent = 'Playing'
+      rafId = requestAnimationFrame(tick)
+    }
+
+    function pause() {
+      playing = false
+      if (rafId) cancelAnimationFrame(rafId)
+      rafId = null
+      document.getElementById('btn-play').textContent = '▶ Play'
+      document.getElementById('stat-msg').textContent = 'Paused'
+    }
+
+    document.getElementById('btn-play').addEventListener('click', () => {
+      playing ? pause() : play()
+    })
+
+    document.getElementById('btn-stop').addEventListener('click', () => {
+      pause()
+      seek(0)
+    })
+
+    // ── Event listeners ──────────────────────────────────────
+    timelineUI.addEventListener('uploop:clip-select', (e) => {
+      const { clip, track } = e.detail
+      inspector.inspect(clip)
+      document.getElementById('stat-msg').textContent = `Selected: ${clip.id} (${track?.type || '?'})`
+    })
+
+    library.addEventListener('uploop:asset-select', (e) => {
+      const asset = e.detail
+      document.getElementById('stat-msg').textContent = `Asset: ${asset.name} (${asset.type})`
+      // In a full editor, this would add the asset to the timeline
+    })
+
+    inspector.addEventListener('uploop:property-change', (e) => {
+      const { target, property, value } = e.detail
+      document.getElementById('stat-msg').textContent = `Changed: ${target.id}.${property} = ${value}`
+    })
+
+    // ── Export hint ──────────────────────────────────────────
+    document.getElementById('btn-export').addEventListener('click', () => {
+      document.getElementById('stat-msg').textContent =
+        'Export: use @uploop/html-video in Node.js → renderVideo({ composition, output: "demo.mp4" })'
+    })
+
+    // ── Keyboard shortcuts ───────────────────────────────────
+    window.addEventListener('keydown', (e) => {
+      switch (e.key) {
+        case ' ': e.preventDefault(); playing ? pause() : play(); break
+        case 'ArrowLeft': seek(currentTime - 0.5); break
+        case 'ArrowRight': seek(currentTime + 0.5); break
+        case 'Home': seek(0); break
+        case 'End': seek(timeline.duration); break
+      }
+    })
+
+    // ── Initial render ───────────────────────────────────────
+    seek(0)
+    updateStatus()
+    preview.showOverlay('grid')
+
+    console.log(
+      '%c🎬 uploop-vided Editor%c | %d tracks | %d clips | %ds timeline',
+      'color:#4f8;font-size:16px', '',
+      timeline.tracks.length,
+      timeline.tracks.reduce((s, t) => s + t.clips.length, 0),
+      Math.ceil(timeline.duration),
+    )
+    console.log('  Space = play/pause | ← → = seek | Home/End = start/end')
+    console.log('  Components: %c<uploop-player> <uploop-timeline> <uploop-preview> <uploop-inspector> <uploop-library>', 'color:#888')
+  </script>
+</body>
+</html>

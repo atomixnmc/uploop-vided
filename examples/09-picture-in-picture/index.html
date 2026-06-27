@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Picture-in-Picture — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    .stage {
+      position: relative;
+      width: min(800px, 90vw);
+      aspect-ratio: 16 / 9;
+      border-radius: 12px;
+      overflow: hidden;
+      background: #000;
+    }
+    video, .stage canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .pip {
+      position: absolute;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 2px solid rgba(255,255,255,0.3);
+      cursor: grab;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      transition: width 0.3s, height 0.3s;
+    }
+    .pip:active { cursor: grabbing; }
+    .pip.size-sm  { width: 120px; height: 68px; }
+    .pip.size-md  { width: 200px; height: 113px; }
+    .pip.size-lg  { width: 300px; height: 169px; }
+    .pip video {
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .controls {
+      display: flex;
+      gap: 8px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: center;
+    }
+    button {
+      padding: 8px 16px;
+      background: #1a1a2e;
+      color: #ccc;
+      border: 1px solid #333;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    button:hover { background: #252540; color: #fff; }
+    button.active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    label {
+      font-size: 13px;
+      color: #888;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    input[type="range"] {
+      accent-color: #4f8;
+      width: 100px;
+    }
+    .info {
+      margin-top: 12px;
+      font-size: 13px;
+      color: #666;
+    }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href=".." class="back">← Examples</a>
+  <div class="stage" id="stage">
+    <video
+      id="main-video"
+      src="https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_2MB.mp4"
+      muted loop playsinline
+    ></video>
+    <div class="pip size-md" id="pip">
+      <video
+        id="pip-video"
+        src="https://test-videos.co.uk/vids/jellyfish/mp4/h264/720/Jellyfish_720_10s_2MB.mp4"
+        muted loop playsinline
+      ></video>
+    </div>
+  </div>
+  <div class="controls">
+    <button data-size="sm">Small</button>
+    <button data-size="md" class="active">Medium</button>
+    <button data-size="lg">Large</button>
+    <label>
+      Opacity
+      <input type="range" id="opacity-slider" min="0.2" max="1" step="0.05" value="1" />
+    </label>
+  </div>
+  <div class="info">
+    Draggable PiP — drag the small video to reposition it
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

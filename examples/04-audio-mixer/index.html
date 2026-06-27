@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Audio Mixer — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 48px 24px;
+    }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .back:hover { color: #fff; }
+    h1 { font-size: 1.5rem; margin-bottom: 4px; }
+    .subtitle { color: #666; font-size: 13px; margin-bottom: 24px; }
+    .stage {
+      width: min(700px, 90vw);
+      background: #151520;
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .master {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      padding: 12px;
+      background: #0d0d18;
+      border-radius: 8px;
+    }
+    .master button {
+      background: #2a2a3a;
+      border: none;
+      color: #e0e0e0;
+      padding: 10px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    .master button:hover { background: #3a3a50; }
+    .master button.playing { background: #4f8; color: #0a0a0f; }
+    .timecode {
+      font-family: monospace;
+      font-size: 14px;
+      color: #888;
+    }
+    .tracks {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .track-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      background: #0d0d18;
+      border-radius: 8px;
+    }
+    .track-row .label {
+      width: 80px;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .track-row input[type="range"] {
+      flex: 1;
+      accent-color: #4f8;
+      height: 6px;
+    }
+    .track-row .vol-val {
+      width: 36px;
+      font-size: 12px;
+      color: #888;
+      text-align: right;
+    }
+    .track-row button {
+      background: none;
+      border: 1px solid #3a3a50;
+      color: #e0e0e0;
+      width: 36px;
+      height: 30px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .track-row button:hover { background: #2a2a3a; }
+    .track-row button.muted { background: #5c1a1a; border-color: #8b3a3a; }
+    .track-row .solo {
+      border-color: #3a5c3a;
+      font-size: 11px;
+      width: 34px;
+    }
+    .track-row .solo.active { background: #5c8a3a; }
+    .vu {
+      width: 40px;
+      height: 4px;
+      background: #1a1a2a;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .vu .fill {
+      height: 100%;
+      background: #4f8;
+      transition: width 0.05s;
+    }
+    .info {
+      margin-top: 8px;
+      font-size: 13px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <a href=".." class="back">← Examples</a>
+  <h1>Audio Mixer</h1>
+  <p class="subtitle">Multi-track audio with volume, mute, solo</p>
+  <div class="stage">
+    <div class="master">
+      <button id="btnMaster">▶ Play All</button>
+      <span class="timecode" id="timecode">00:00.0</span>
+    </div>
+    <div class="tracks" id="tracks"></div>
+  </div>
+  <div class="info">
+    Using <code>@uploop/timeline</code> — Timeline · Track · Clip for audio sequencing
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

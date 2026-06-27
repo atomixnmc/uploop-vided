@@ -1,0 +1,747 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>History Timeline — uploop-vided</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                background: #0a0a0f;
+                color: #e0e0e0;
+                font-family: system-ui, sans-serif;
+                display: flex;
+                flex-direction: column;
+                height: 100vh;
+                overflow: hidden;
+            }
+            .back {
+                position: fixed;
+                top: 16px;
+                left: 16px;
+                z-index: 10;
+                color: #888;
+                text-decoration: none;
+                font-size: 14px;
+            }
+            .back:hover {
+                color: #fff;
+            }
+            .title-bar {
+                position: fixed;
+                top: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #151520;
+                padding: 10px 24px;
+                border-radius: 0 0 12px 12px;
+                font-size: 15px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                z-index: 5;
+                border: 1px solid #252535;
+                border-top: none;
+            }
+            .filters {
+                position: fixed;
+                top: 52px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 5;
+                display: flex;
+                gap: 6px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            .filters button {
+                background: #1e1e30;
+                color: #e0e0e0;
+                border: 1px solid #333;
+                padding: 5px 12px;
+                border-radius: 16px;
+                cursor: pointer;
+                font-size: 11px;
+                transition: all 0.2s;
+            }
+            .filters button:hover {
+                background: #2a2a40;
+            }
+            .filters button.active {
+                background: #2a3a2a;
+                border-color: #4f8;
+                color: #4f8;
+            }
+            .canvas-wrap {
+                flex: 1;
+                position: relative;
+                overflow: hidden;
+                margin-top: 80px;
+            }
+            canvas {
+                display: block;
+            }
+            .zoom-controls {
+                position: fixed;
+                bottom: 20px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 5;
+                display: flex;
+                gap: 8px;
+                align-items: center;
+                background: #151520;
+                border: 1px solid #252535;
+                border-radius: 20px;
+                padding: 6px 12px;
+            }
+            .zoom-controls button {
+                background: none;
+                border: none;
+                color: #e0e0e0;
+                cursor: pointer;
+                font-size: 18px;
+                padding: 4px 8px;
+                border-radius: 4px;
+            }
+            .zoom-controls button:hover {
+                color: #4f8;
+            }
+            .zoom-label {
+                font-size: 12px;
+                color: #888;
+                min-width: 50px;
+                text-align: center;
+            }
+            .tooltip {
+                position: fixed;
+                pointer-events: none;
+                z-index: 8;
+                background: #1e1e30;
+                border: 1px solid #333;
+                border-radius: 8px;
+                padding: 10px 14px;
+                font-size: 12px;
+                max-width: 260px;
+                opacity: 0;
+                transition: opacity 0.15s;
+                line-height: 1.5;
+            }
+            .tooltip.visible {
+                opacity: 1;
+            }
+            .tooltip h4 {
+                color: #4f8;
+                font-size: 13px;
+                margin-bottom: 2px;
+            }
+            .tooltip .cat {
+                font-size: 10px;
+                color: #888;
+                margin-bottom: 4px;
+            }
+            .tooltip p {
+                color: #aaa;
+            }
+            .info-box {
+                position: fixed;
+                bottom: 70px;
+                left: 50%;
+                transform: translateX(-50%);
+                z-index: 4;
+                background: #0f0f1a;
+                border: 1px solid #252535;
+                border-radius: 8px;
+                padding: 8px 16px;
+                font-size: 11px;
+                color: #888;
+                text-align: center;
+            }
+            .info-box code {
+                color: #4f8;
+            }
+        </style>
+    </head>
+    <body>
+        <a href="../.." class="back">← Examples</a>
+        <div class="title-bar">
+            📜 History Timeline · Scientific Discoveries
+        </div>
+
+        <div class="filters">
+            <button data-cat="all" class="active">🌟 All</button>
+            <button data-cat="physics">⚛️ Physics</button>
+            <button data-cat="math">📐 Math</button>
+            <button data-cat="biology">🧬 Biology</button>
+            <button data-cat="chemistry">⚗️ Chemistry</button>
+            <button data-cat="astronomy">🔭 Astronomy</button>
+        </div>
+
+        <div class="canvas-wrap">
+            <canvas id="canvas"></canvas>
+        </div>
+
+        <div class="tooltip" id="tooltip">
+            <h4></h4>
+            <div class="cat"></div>
+            <p></p>
+        </div>
+
+        <div class="zoom-controls">
+            <button id="btn-zoom-out">−</button>
+            <span class="zoom-label" id="zoom-label">1.0×</span>
+            <button id="btn-zoom-in">+</button>
+            <button id="btn-reset">↺</button>
+        </div>
+
+        <div class="info-box">
+            Scroll to navigate through time · Zoom to see more detail · Click
+            events for info · <code>Timeline</code> &amp; <code>Clip</code> from
+            <code>@uploop/timeline</code>
+        </div>
+
+        <script type="module">
+            import { Timeline, Clip } from "@uploop/timeline";
+            import { easing } from "@uploop/timeline";
+            import { blendModes } from "@uploop/compositor";
+
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+            const tooltip = document.getElementById("tooltip");
+
+            // ── Timeline data model (using @uploop/timeline) ──────────────────
+            const scienceTimeline = new Timeline({
+                name: "Scientific Discoveries",
+                fps: 30,
+                width: 1920,
+                height: 1080,
+            });
+
+            // ── Discovery data ────────────────────────────────────────────────
+            const discoveries = [
+                {
+                    year: -240,
+                    title: "Eratosthenes Measures Earth",
+                    desc: "Calculated Earth's circumference using shadows and geometry, within 2% of modern value.",
+                    cat: "astronomy",
+                    color: "#4f8",
+                },
+                {
+                    year: 1543,
+                    title: "Copernican Revolution",
+                    desc: "Copernicus proposes heliocentric model placing the Sun at the center of the solar system.",
+                    cat: "astronomy",
+                    color: "#4f8",
+                },
+                {
+                    year: 1609,
+                    title: "Kepler's Laws",
+                    desc: "Johannes Kepler publishes first two laws of planetary motion describing elliptical orbits.",
+                    cat: "astronomy",
+                    color: "#4f8",
+                },
+                {
+                    year: 1628,
+                    title: "Circulation of Blood",
+                    desc: "William Harvey demonstrates blood circulates through the body pumped by the heart.",
+                    cat: "biology",
+                    color: "#f8a",
+                },
+                {
+                    year: 1665,
+                    title: "Discovery of Cells",
+                    desc: 'Robert Hooke observes cork cells through microscope, coining the term "cell".',
+                    cat: "biology",
+                    color: "#f8a",
+                },
+                {
+                    year: 1687,
+                    title: "Newton's Principia",
+                    desc: "Isaac Newton publishes laws of motion and universal gravitation, founding classical mechanics.",
+                    cat: "physics",
+                    color: "#f80",
+                },
+                {
+                    year: 1752,
+                    title: "Lightning is Electric",
+                    desc: "Benjamin Franklin's kite experiment proves lightning is electrical in nature.",
+                    cat: "physics",
+                    color: "#f80",
+                },
+                {
+                    year: 1774,
+                    title: "Discovery of Oxygen",
+                    desc: "Joseph Priestley isolates oxygen gas, laying foundations for modern chemistry.",
+                    cat: "chemistry",
+                    color: "#4af",
+                },
+                {
+                    year: 1789,
+                    title: "Lavoisier's Elements",
+                    desc: "Antoine Lavoisier publishes first list of chemical elements, founding modern chemistry.",
+                    cat: "chemistry",
+                    color: "#4af",
+                },
+                {
+                    year: 1859,
+                    title: "Theory of Evolution",
+                    desc: 'Charles Darwin publishes "On the Origin of Species" proposing natural selection.',
+                    cat: "biology",
+                    color: "#f8a",
+                },
+                {
+                    year: 1865,
+                    title: "Maxwell's Equations",
+                    desc: "James Clerk Maxwell unifies electricity and magnetism into electromagnetic theory.",
+                    cat: "physics",
+                    color: "#f80",
+                },
+                {
+                    year: 1869,
+                    title: "Periodic Table",
+                    desc: "Dmitri Mendeleev publishes the periodic table of elements, predicting undiscovered elements.",
+                    cat: "chemistry",
+                    color: "#4af",
+                },
+                {
+                    year: 1905,
+                    title: "Special Relativity",
+                    desc: "Einstein publishes special relativity (E=mc²), transforming our understanding of space and time.",
+                    cat: "physics",
+                    color: "#f80",
+                },
+                {
+                    year: 1928,
+                    title: "Penicillin Discovered",
+                    desc: "Alexander Fleming discovers penicillin, the first antibiotic, revolutionizing medicine.",
+                    cat: "biology",
+                    color: "#f8a",
+                },
+                {
+                    year: 1953,
+                    title: "DNA Structure",
+                    desc: "Watson and Crick discover the double helix structure of DNA, foundation of molecular biology.",
+                    cat: "biology",
+                    color: "#f8a",
+                },
+            ];
+
+            // Register as clips in the timeline
+            discoveries.forEach((d, i) => {
+                const clip = new Clip({
+                    id: `discovery-${i}`,
+                    source: d.title,
+                    inPoint: d.year + 300, // offset by 300 to avoid negative times
+                    outPoint: d.year + 301,
+                    props: { category: d.cat, color: d.color, desc: d.desc },
+                });
+                scienceTimeline.addTrack({
+                    id: `track-${i}`,
+                    name: d.title,
+                    muted: false,
+                    clips: [clip],
+                    get duration() {
+                        return this.clips[0]?.duration || 0;
+                    },
+                    getClipAt(time) {
+                        return this.clips[0]?.isActiveAt(time)
+                            ? this.clips[0]
+                            : null;
+                    },
+                });
+            });
+
+            // ── State ─────────────────────────────────────────────────────────
+            let scrollX = 0;
+            let targetScrollX = 0;
+            let zoomLevel = 1;
+            let activeFilter = "all";
+            let hoveredEvent = null;
+            let mouseX = 0;
+            let mouseY = 0;
+
+            // ── Filter ────────────────────────────────────────────────────────
+            const filteredDiscoveries = () => {
+                if (activeFilter === "all") return discoveries;
+                return discoveries.filter((d) => d.cat === activeFilter);
+            };
+
+            const catColors = {
+                physics: "#f80",
+                math: "#ff0",
+                biology: "#f8a",
+                chemistry: "#4af",
+                astronomy: "#4f8",
+            };
+
+            // ── Draw ──────────────────────────────────────────────────────────
+            function draw() {
+                const w = canvas.width;
+                const h = canvas.height;
+                ctx.clearRect(0, 0, w, h);
+
+                const filtered = filteredDiscoveries();
+                const years = filtered.map((d) => d.year);
+                const minYear = Math.min(...years);
+                const maxYear = Math.max(...years);
+                const yearRange = maxYear - minYear;
+
+                // Timeline dimensions
+                const baseSpacing = 150;
+                const spacing = baseSpacing * zoomLevel;
+                const totalWidth = (filtered.length + 1) * spacing;
+                const offsetX = w / 2 - scrollX;
+
+                // Draw timeline line
+                const lineY = h * 0.45;
+                const grad = ctx.createLinearGradient(0, lineY, w, lineY);
+                grad.addColorStop(0, "rgba(255,255,255,0.05)");
+                grad.addColorStop(0.2, "rgba(255,255,255,0.2)");
+                grad.addColorStop(0.5, "rgba(255,255,255,0.4)");
+                grad.addColorStop(0.8, "rgba(255,255,255,0.2)");
+                grad.addColorStop(1, "rgba(255,255,255,0.05)");
+                ctx.strokeStyle = grad;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(0, lineY);
+                ctx.lineTo(w, lineY);
+                ctx.stroke();
+
+                // Draw era labels
+                const eraRanges = [
+                    {
+                        label: "Ancient",
+                        start: -300,
+                        end: 500,
+                        color: "rgba(200,180,140,0.15)",
+                    },
+                    {
+                        label: "Renaissance",
+                        start: 1400,
+                        end: 1700,
+                        color: "rgba(180,140,100,0.15)",
+                    },
+                    {
+                        label: "Enlightenment",
+                        start: 1700,
+                        end: 1900,
+                        color: "rgba(140,160,200,0.15)",
+                    },
+                    {
+                        label: "Modern",
+                        start: 1900,
+                        end: 2050,
+                        color: "rgba(100,180,140,0.15)",
+                    },
+                ];
+
+                for (const era of eraRanges) {
+                    const sx =
+                        offsetX +
+                        ((era.start - minYear) / yearRange) * totalWidth;
+                    const ex =
+                        offsetX +
+                        ((era.end - minYear) / yearRange) * totalWidth;
+                    if (ex > 0 && sx < w) {
+                        ctx.fillStyle = era.color;
+                        ctx.fillRect(
+                            Math.max(0, sx),
+                            0,
+                            Math.min(w, ex) - Math.max(0, sx),
+                            h,
+                        );
+                    }
+                }
+
+                // Year markers
+                ctx.fillStyle = "#666";
+                ctx.font = `${Math.max(10, 11 * zoomLevel)}px system-ui`;
+                ctx.textAlign = "center";
+                const yearStep = Math.max(
+                    50,
+                    Math.round(100 / zoomLevel / 50) * 50,
+                );
+                for (
+                    let y = Math.floor(minYear / yearStep) * yearStep;
+                    y <= maxYear;
+                    y += yearStep
+                ) {
+                    const x =
+                        offsetX + ((y - minYear) / yearRange) * totalWidth;
+                    if (x > 20 && x < w - 20) {
+                        ctx.fillText(y, x, lineY - 40);
+                        ctx.strokeStyle = "rgba(255,255,255,0.2)";
+                        ctx.beginPath();
+                        ctx.moveTo(x, lineY - 15);
+                        ctx.lineTo(x, lineY + 5);
+                        ctx.stroke();
+                    }
+                }
+
+                // Draw event cards
+                for (let i = 0; i < filtered.length; i++) {
+                    const d = filtered[i];
+                    const x = offsetX + i * spacing + spacing / 2;
+                    if (x < -100 || x > w + 100) continue;
+
+                    const cardW = Math.max(100, 140 * zoomLevel);
+                    const cardH = Math.max(50, 70 * zoomLevel);
+                    const isAbove = i % 2 === 0;
+                    const cardY = isAbove ? lineY - cardH - 30 : lineY + 30;
+                    const isHovered = hoveredEvent === d;
+
+                    // Dot on timeline
+                    ctx.fillStyle = d.color || "#4f8";
+                    ctx.beginPath();
+                    ctx.arc(x, lineY, 5 * zoomLevel, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = "#0a0a0f";
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+
+                    // Connector line
+                    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+                    ctx.beginPath();
+                    ctx.moveTo(x, lineY);
+                    ctx.lineTo(x, isAbove ? cardY + cardH : cardY);
+                    ctx.stroke();
+
+                    // Card background
+                    const cardAlpha = isHovered ? 1 : 0.85;
+                    ctx.fillStyle = `rgba(21,21,32,${cardAlpha})`;
+                    ctx.strokeStyle = isHovered ? d.color || "#4f8" : "#333";
+                    ctx.lineWidth = isHovered ? 2 : 1;
+                    roundRect(ctx, x - cardW / 2, cardY, cardW, cardH, 8);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Category color bar
+                    ctx.fillStyle = d.color || "#4f8";
+                    ctx.fillRect(x - cardW / 2, cardY, 4, cardH);
+
+                    // Year
+                    const yearStr =
+                        d.year < 0 ? `${Math.abs(d.year)} BCE` : `CE ${d.year}`;
+                    ctx.fillStyle = d.color || "#4f8";
+                    const fsz = Math.max(9, 10 * zoomLevel);
+                    ctx.font = `bold ${fsz}px system-ui`;
+                    ctx.textAlign = "center";
+                    ctx.fillText(yearStr, x, cardY + fsz + 4);
+
+                    // Title
+                    const titleFsz = Math.max(8, 9 * zoomLevel);
+                    ctx.fillStyle = "#e0e0e0";
+                    ctx.font = `${titleFsz}px system-ui`;
+                    const maxTextW = cardW - 16;
+                    const words = d.title.split(" ");
+                    let line = "";
+                    let lineYOff = cardY + fsz + titleFsz + 8;
+                    for (const wrd of words) {
+                        const test = line + wrd + " ";
+                        if (
+                            ctx.measureText(test).width > maxTextW &&
+                            line !== ""
+                        ) {
+                            ctx.fillText(line.trim(), x, lineYOff);
+                            line = wrd + " ";
+                            lineYOff += titleFsz + 2;
+                            if (lineYOff > cardY + cardH - 4) break;
+                        } else {
+                            line = test;
+                        }
+                    }
+                    if (line.trim() && lineYOff <= cardY + cardH - 4) {
+                        ctx.fillText(line.trim(), x, lineYOff);
+                    }
+
+                    // Category tag
+                    ctx.fillStyle = "rgba(255,255,255,0.5)";
+                    ctx.font = `${Math.max(7, 8 * zoomLevel)}px system-ui`;
+                    ctx.fillText(d.cat.toUpperCase(), x, cardY + cardH - 6);
+                }
+            }
+
+            function roundRect(ctx, x, y, w, h, r) {
+                ctx.beginPath();
+                ctx.moveTo(x + r, y);
+                ctx.lineTo(x + w - r, y);
+                ctx.arcTo(x + w, y, x + w, y + r, r);
+                ctx.lineTo(x + w, y + h - r);
+                ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+                ctx.lineTo(x + r, y + h);
+                ctx.arcTo(x, y + h, x, y + h - r, r);
+                ctx.lineTo(x, y + r);
+                ctx.arcTo(x, y, x + r, y, r);
+                ctx.closePath();
+            }
+
+            // ── Hit testing ───────────────────────────────────────────────────
+            function hitTest(mx, my) {
+                const w = canvas.width;
+                const h = canvas.height;
+                const filtered = filteredDiscoveries();
+                const years = filtered.map((d) => d.year);
+                const minYear = Math.min(...years);
+                const maxYear = Math.max(...years);
+                const spacing = 150 * zoomLevel;
+                const totalWidth = (filtered.length + 1) * spacing;
+                const offsetX = w / 2 - scrollX;
+                const lineY = h * 0.45;
+
+                for (let i = 0; i < filtered.length; i++) {
+                    const x = offsetX + i * spacing + spacing / 2;
+                    const isAbove = i % 2 === 0;
+                    const cardW = Math.max(100, 140 * zoomLevel);
+                    const cardH = Math.max(50, 70 * zoomLevel);
+                    const cardY = isAbove ? lineY - cardH - 30 : lineY + 30;
+
+                    if (
+                        mx > x - cardW / 2 &&
+                        mx < x + cardW / 2 &&
+                        my > cardY &&
+                        my < cardY + cardH
+                    ) {
+                        return filtered[i];
+                    }
+                }
+                return null;
+            }
+
+            // ── Mouse events ──────────────────────────────────────────────────
+            canvas.addEventListener("mousemove", (e) => {
+                const rect = canvas.getBoundingClientRect();
+                const mx =
+                    (e.clientX - rect.left) * (canvas.width / rect.width);
+                const my =
+                    (e.clientY - rect.top) * (canvas.height / rect.height);
+                mouseX = e.clientX;
+                mouseY = e.clientY;
+                hoveredEvent = hitTest(mx, my);
+
+                if (hoveredEvent) {
+                    tooltip.querySelector("h4").textContent =
+                        hoveredEvent.title;
+                    tooltip.querySelector(".cat").textContent =
+                        hoveredEvent.cat.charAt(0).toUpperCase() +
+                        hoveredEvent.cat.slice(1) +
+                        " · " +
+                        (hoveredEvent.year < 0
+                            ? Math.abs(hoveredEvent.year) + " BCE"
+                            : hoveredEvent.year + " CE");
+                    tooltip.querySelector("p").textContent = hoveredEvent.desc;
+                    tooltip.classList.add("visible");
+                    tooltip.style.left =
+                        Math.min(mouseX + 16, window.innerWidth - 280) + "px";
+                    tooltip.style.top =
+                        Math.min(mouseY + 16, window.innerHeight - 120) + "px";
+                } else {
+                    tooltip.classList.remove("visible");
+                }
+            });
+
+            canvas.addEventListener("mouseleave", () => {
+                hoveredEvent = null;
+                tooltip.classList.remove("visible");
+            });
+
+            // ── Scroll / pan ──────────────────────────────────────────────────
+            canvas.addEventListener(
+                "wheel",
+                (e) => {
+                    e.preventDefault();
+                    if (e.ctrlKey || e.metaKey) {
+                        // Zoom
+                        const delta = -e.deltaY * 0.001;
+                        zoomLevel = Math.max(
+                            0.3,
+                            Math.min(3, zoomLevel + delta),
+                        );
+                        document.getElementById("zoom-label").textContent =
+                            zoomLevel.toFixed(1) + "×";
+                    } else {
+                        // Pan
+                        targetScrollX += e.deltaX + e.deltaY;
+                        targetScrollX = Math.max(0, targetScrollX);
+                    }
+                },
+                { passive: false },
+            );
+
+            // Touch scroll
+            let touchStartX = 0;
+            let touchStartScroll = 0;
+            canvas.addEventListener("touchstart", (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartScroll = targetScrollX;
+            });
+            canvas.addEventListener("touchmove", (e) => {
+                const dx = touchStartX - e.touches[0].clientX;
+                targetScrollX = touchStartScroll + dx;
+            });
+
+            // ── Zoom controls ─────────────────────────────────────────────────
+            document
+                .getElementById("btn-zoom-in")
+                .addEventListener("click", () => {
+                    zoomLevel = Math.min(3, zoomLevel + 0.2);
+                    document.getElementById("zoom-label").textContent =
+                        zoomLevel.toFixed(1) + "×";
+                });
+            document
+                .getElementById("btn-zoom-out")
+                .addEventListener("click", () => {
+                    zoomLevel = Math.max(0.3, zoomLevel - 0.2);
+                    document.getElementById("zoom-label").textContent =
+                        zoomLevel.toFixed(1) + "×";
+                });
+            document
+                .getElementById("btn-reset")
+                .addEventListener("click", () => {
+                    zoomLevel = 1;
+                    targetScrollX = 0;
+                    document.getElementById("zoom-label").textContent = "1.0×";
+                });
+
+            // ── Category filters ──────────────────────────────────────────────
+            document.querySelectorAll(".filters button").forEach((btn) => {
+                btn.addEventListener("click", () => {
+                    activeFilter = btn.dataset.cat;
+                    document
+                        .querySelectorAll(".filters button")
+                        .forEach((b) => b.classList.remove("active"));
+                    btn.classList.add("active");
+                    targetScrollX = 0;
+                });
+            });
+
+            // ── Resize ────────────────────────────────────────────────────────
+            function resize() {
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+            }
+            window.addEventListener("resize", resize);
+            resize();
+
+            // ── Loop ──────────────────────────────────────────────────────────
+            function loop() {
+                // Smooth scroll interpolation
+                scrollX += (targetScrollX - scrollX) * easing.easeOut(0.15);
+                draw();
+                requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+
+            console.log(
+                "%c📜 History Timeline%c | Scientific discoveries 240 BCE – 1953 CE",
+                "color:#4f8",
+                "",
+            );
+            console.log(
+                "  Scroll to pan · Ctrl+Scroll to zoom · Click events · Filter by category",
+            );
+        </script>
+    </body>
+</html>

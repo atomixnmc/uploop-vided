@@ -1,0 +1,30 @@
+{
+  "name": "@uploop/html-video",
+  "version": "0.1.0",
+  "description": "Render HTML compositions to MP4 via headless Chromium + ffmpeg — Remotion-style server-side rendering",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@uploop/timeline": "workspace:*",
+    "@uploop/compositor": "workspace:*"
+  },
+  "peerDependencies": {
+    "puppeteer": ">=22.0.0"
+  },
+  "peerDependenciesMeta": {
+    "puppeteer": {
+      "optional": true
+    }
+  }
+}

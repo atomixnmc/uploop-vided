@@ -1,0 +1,703 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Calculus Visualization — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 24px 40px;
+      gap: 16px;
+    }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+      z-index: 100;
+    }
+    .back:hover { color: #fff; }
+    .title-bar {
+      width: min(800px, 90vw);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .title-bar h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #4f8;
+    }
+    .title-bar span {
+      font-size: 12px;
+      color: #666;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+    }
+    .tabs button {
+      background: #151520;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 8px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .tabs button:hover { background: #1e1e30; }
+    .tabs button.active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .stage {
+      width: min(800px, 90vw);
+      height: min(460px, 55vh);
+      background: #151520;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    .stage canvas { width: 100%; height: 100%; display: block; }
+    .info-panel {
+      width: min(800px, 90vw);
+      background: #151520;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: #aaa;
+      line-height: 1.5;
+      min-height: 42px;
+    }
+    .info-panel .formula {
+      color: #4f8;
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+    }
+    .info-panel .value {
+      color: #f8c040;
+      font-weight: 600;
+    }
+    .controls {
+      width: min(800px, 90vw);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .controls button {
+      background: #151520;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .controls button:hover { background: #1e1e30; }
+    .controls button:disabled { opacity: 0.3; cursor: default; }
+    .controls button.active { background: #2a3a2a; border-color: #4f8; }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex: 1;
+      min-width: 200px;
+    }
+    .slider-row label { font-size: 12px; color: #888; white-space: nowrap; }
+    .slider-row input[type="range"] { flex: 1; accent-color: #4f8; }
+    .slider-row span { font-size: 12px; color: #4f8; min-width: 28px; text-align: right; }
+    .legend {
+      display: flex;
+      gap: 14px;
+    }
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: #888;
+    }
+    .legend .swatch {
+      width: 10px; height: 10px;
+      border-radius: 2px;
+      display: inline-block;
+    }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+
+  <div class="title-bar">
+    <h1>📐 Calculus Visualization</h1>
+    <span>Interactive calculus concepts</span>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="derivative" class="active">Derivative</button>
+    <button data-tab="integral">Integral</button>
+    <button data-tab="limits">Limits</button>
+  </div>
+
+  <div class="stage">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="info-panel" id="info"></div>
+
+  <div class="controls" id="controls"></div>
+
+  <script type="module">
+    import { easing } from '@uploop/timeline'
+    import { blendModes } from '@uploop/compositor'
+
+    // ── DOM refs ──────────────────────────────────────────────────────
+    const canvas = document.getElementById('canvas')
+    const ctx = canvas.getContext('2d')
+    const infoPanel = document.getElementById('info')
+    const controlsDiv = document.getElementById('controls')
+    const tabButtons = document.querySelectorAll('.tabs button')
+
+    let W, H // canvas logical size
+
+    // ── State ─────────────────────────────────────────────────────────
+    let currentTab = 'derivative'
+    let smoothTime = 0
+
+    // Derivative state
+    let derivX = Math.PI // draggable x-position on sine curve
+    let dragDeriv = false
+
+    // Integral state
+    let integralRectCount = 10 // 1-50 Riemann rectangles
+    let integralMethod = 'midpoint' // left | right | midpoint
+
+    // Limits state
+    let limitA = 1 // approach x→a
+    let limitAnimT = 0
+
+    // Playback
+    let playing = true
+    let speed = 1
+
+    // ── Coordinate transforms ─────────────────────────────────────────
+    function xToCanvas(mathX, xMin, xMax) {
+      return ((mathX - xMin) / (xMax - xMin)) * W
+    }
+    function yToCanvas(mathY, yMin, yMax) {
+      return H - ((mathY - yMin) / (yMax - yMin)) * H
+    }
+
+    // ── Derivative Tab ────────────────────────────────────────────────
+    function drawDerivative() {
+      const xMin = -0.5, xMax = 2 * Math.PI + 0.5
+      const yMin = -1.8, yMax = 1.8
+      const fx = (x) => Math.sin(x)
+      const dfx = (x) => Math.cos(x)
+
+      ctx.clearRect(0, 0, W, H)
+
+      // Grid
+      ctx.strokeStyle = '#1a1a28'
+      ctx.lineWidth = 1
+      for (let y = -1; y <= 1; y += 0.5) {
+        const py = yToCanvas(y, yMin, yMax)
+        ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke()
+      }
+      for (let x = 0; x <= 2 * Math.PI; x += Math.PI / 2) {
+        const px = xToCanvas(x, xMin, xMax)
+        ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke()
+      }
+
+      // Axes
+      ctx.strokeStyle = '#444'
+      ctx.lineWidth = 1.5
+      const originY = yToCanvas(0, yMin, yMax)
+      ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(W, originY); ctx.stroke()
+      const originX = xToCanvas(0, xMin, xMax)
+      ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, H); ctx.stroke()
+
+      // f(x) = sin(x) curve
+      ctx.strokeStyle = '#4f8'
+      ctx.lineWidth = 2.5
+      ctx.beginPath()
+      for (let px = 0; px <= W; px++) {
+        const mx = xMin + (px / W) * (xMax - xMin)
+        const py = yToCanvas(fx(mx), yMin, yMax)
+        px === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py)
+      }
+      ctx.stroke()
+
+      // Tangent line at derivX
+      const cx = xToCanvas(derivX, xMin, xMax)
+      const cy = yToCanvas(fx(derivX), yMin, yMax)
+      const slope = dfx(derivX)
+      const tangentLen = 120
+      const dx = tangentLen / Math.sqrt(1 + slope * slope)
+      const dy = slope * dx
+      const x1 = cx - dx, y1 = cy + dy * (H / (yMax - yMin)) * ((yMax - yMin) / (xMax - xMin)) * (W / H)
+      const x2 = cx + dx, y2 = cy - dy * (H / (yMax - yMin)) * ((yMax - yMin) / (xMax - xMin)) * (W / H)
+
+      // Recompute with proper aspect ratio
+      const aspect = (xMax - xMin) / W * H / (yMax - yMin)
+      const screenDx = tangentLen
+      const screenDy = -slope * screenDx * aspect
+
+      ctx.strokeStyle = '#f8c040'
+      ctx.lineWidth = 2
+      ctx.setLineDash([6, 3])
+      ctx.beginPath()
+      ctx.moveTo(cx - screenDx, cy - screenDy)
+      ctx.lineTo(cx + screenDx, cy + screenDy)
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // Draggable point
+      ctx.fillStyle = '#f8c040'
+      ctx.beginPath()
+      ctx.arc(cx, cy, 7, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.strokeStyle = '#fff'
+      ctx.lineWidth = 2
+      ctx.stroke()
+
+      // Slope triangle
+      const triW = 60
+      ctx.strokeStyle = 'rgba(248,192,64,0.4)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([3, 4])
+      ctx.beginPath()
+      ctx.moveTo(cx, cy)
+      ctx.lineTo(cx + triW, cy)
+      ctx.lineTo(cx + triW, cy + screenDy * (triW / screenDx))
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.fillStyle = '#f8c040'
+      ctx.font = '12px system-ui'
+      ctx.fillText('dx', cx + triW / 2 - 8, cy + 16)
+      const dyLabelY = cy + screenDy * (triW / screenDx) / 2
+      ctx.fillText('dy', cx + triW + 6, dyLabelY)
+
+      // Labels
+      ctx.fillStyle = '#888'
+      ctx.font = '11px system-ui'
+      ctx.textAlign = 'right'
+      for (let x = 0; x <= 2 * Math.PI; x += Math.PI / 2) {
+        const labels = { 0: '0', [Math.PI/2]: 'π/2', [Math.PI]: 'π', [3*Math.PI/2]: '3π/2', [2*Math.PI]: '2π' }
+        const px = xToCanvas(x, xMin, xMax)
+        ctx.fillText(labels[x] || '', px - 4, originY + 14)
+      }
+      ctx.textAlign = 'start'
+
+      // Info
+      infoPanel.innerHTML = `
+        <span class="formula">f(x) = sin(x)</span>  
+        <span class="formula">f'(x) = cos(x)</span><br>
+        At x = <span class="value">${derivX.toFixed(3)}</span>:
+        f(x) = <span class="value">${fx(derivX).toFixed(4)}</span>  
+        f'(x) = <span class="value">${slope.toFixed(4)}</span>
+        <br><span style="color:#666">Drag the yellow point to explore the derivative</span>
+      `
+    }
+
+    // ── Integral Tab ──────────────────────────────────────────────────
+    function drawIntegral() {
+      const xMin = -0.5, xMax = Math.PI + 0.5
+      const yMin = -0.3, yMax = 1.3
+      const fx = (x) => Math.sin(x)
+      const a = 0, b = Math.PI
+
+      ctx.clearRect(0, 0, W, H)
+
+      // Grid
+      ctx.strokeStyle = '#1a1a28'
+      ctx.lineWidth = 1
+      for (let y = 0; y <= 1; y += 0.25) {
+        const py = yToCanvas(y, yMin, yMax)
+        ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke()
+      }
+      const originY = yToCanvas(0, yMin, yMax)
+      ctx.strokeStyle = '#444'
+      ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(W, originY); ctx.stroke()
+
+      // f(x) curve
+      ctx.strokeStyle = '#4f8'
+      ctx.lineWidth = 2.5
+      ctx.beginPath()
+      for (let px = 0; px <= W; px++) {
+        const mx = xMin + (px / W) * (xMax - xMin)
+        if (mx >= a && mx <= b) {
+          const py = yToCanvas(fx(mx), yMin, yMax)
+          ctx.lineTo(px, py)
+        } else {
+          ctx.moveTo(px, yToCanvas(fx(mx), yMin, yMax))
+        }
+      }
+      ctx.stroke()
+
+      // Riemann rectangles
+      const dx = (b - a) / integralRectCount
+      let totalArea = 0
+
+      for (let i = 0; i < integralRectCount; i++) {
+        const x0 = a + i * dx
+        const x1 = x0 + dx
+        let sampleX
+        if (integralMethod === 'left') sampleX = x0
+        else if (integralMethod === 'right') sampleX = x1
+        else sampleX = x0 + dx / 2 // midpoint
+
+        const h = fx(sampleX)
+        totalArea += h * dx
+
+        const rx = xToCanvas(x0, xMin, xMax)
+        const rw = xToCanvas(x1, xMin, xMax) - rx
+        const rh = -h * (H / (yMax - yMin))
+        const ry = originY
+
+        // Rectangle fill
+        const alpha = 0.15 + 0.3 * (h / 1)
+        ctx.fillStyle = h >= 0 ? `rgba(79,255,136,${alpha})` : `rgba(255,100,100,${alpha})`
+        ctx.fillRect(rx, ry, rw, rh)
+
+        // Rectangle border
+        ctx.strokeStyle = 'rgba(79,255,136,0.4)'
+        ctx.lineWidth = 0.5
+        ctx.strokeRect(rx, ry, rw, rh)
+
+        // Sample point
+        const sx = xToCanvas(sampleX, xMin, xMax)
+        const sy = yToCanvas(h, yMin, yMax)
+        if (integralMethod === 'midpoint') {
+          ctx.fillStyle = '#f8c040'
+          ctx.beginPath()
+          ctx.arc(sx, sy, 3, 0, Math.PI * 2)
+          ctx.fill()
+        }
+      }
+
+      // Integration bounds
+      const ax = xToCanvas(a, xMin, xMax)
+      const bx = xToCanvas(b, xMin, xMax)
+      ctx.strokeStyle = '#f8c040'
+      ctx.lineWidth = 2
+      ctx.setLineDash([5, 5])
+      ctx.beginPath(); ctx.moveTo(ax, originY - 20); ctx.lineTo(ax, originY + 80); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(bx, originY - 20); ctx.lineTo(bx, originY + 80); ctx.stroke()
+      ctx.setLineDash([])
+      ctx.fillStyle = '#f8c040'
+      ctx.font = '12px system-ui'
+      ctx.fillText('a', ax + 4, originY - 6)
+      ctx.fillText('b', bx - 18, originY - 6)
+
+      // Actual integral = 2
+      const actual = 2
+      infoPanel.innerHTML = `
+        <span class="formula">∫₀^{π} sin(x) dx</span> = <span class="value">${actual.toFixed(4)}</span> (exact)<br>
+        Riemann sum (<span class="value">${integralRectCount}</span> rects, ${integralMethod}):
+        ≈ <span class="value">${totalArea.toFixed(4)}</span>  
+        error: <span class="value">${Math.abs(totalArea - actual).toFixed(4)}</span>
+      `
+    }
+
+    // ── Limits Tab ────────────────────────────────────────────────────
+    function drawLimits() {
+      const xMin = -0.5, xMax = 3.5
+      const yMin = -0.5, yMax = 3.5
+
+      // f(x) = (x^2 - 1) / (x - 1) for x≠1, with limit=2 as x→1
+      const fx = (x) => (x * x - 1) / (x - 1)
+      const limitVal = 2
+
+      ctx.clearRect(0, 0, W, H)
+
+      // Grid
+      ctx.strokeStyle = '#1a1a28'
+      ctx.lineWidth = 1
+      for (let y = 0; y <= 3; y++) {
+        const py = yToCanvas(y, yMin, yMax)
+        ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke()
+      }
+      for (let x = 0; x <= 3; x++) {
+        const px = xToCanvas(x, xMin, xMax)
+        ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke()
+      }
+
+      // Axes
+      const originY = yToCanvas(0, yMin, yMax)
+      const originX = xToCanvas(0, xMin, xMax)
+      ctx.strokeStyle = '#444'
+      ctx.lineWidth = 1.5
+      ctx.beginPath(); ctx.moveTo(0, originY); ctx.lineTo(W, originY); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(originX, 0); ctx.lineTo(originX, H); ctx.stroke()
+
+      // f(x) curve (hole at x=1)
+      ctx.strokeStyle = '#4f8'
+      ctx.lineWidth = 2.5
+      ctx.beginPath()
+      for (let px = 0; px <= W; px++) {
+        const mx = xMin + (px / W) * (xMax - xMin)
+        if (Math.abs(mx - 1) < 0.05) {
+          ctx.moveTo(px, yToCanvas(fx(mx), yMin, yMax))
+          continue
+        }
+        const py = yToCanvas(fx(mx), yMin, yMax)
+        if (py < -100 || py > H + 100) { ctx.moveTo(px, py); continue }
+        ctx.lineTo(px, py)
+      }
+      ctx.stroke()
+
+      // Hole at x=1
+      const hx = xToCanvas(1, xMin, xMax)
+      const hy = yToCanvas(limitVal, yMin, yMax)
+      ctx.fillStyle = '#0a0a0f'
+      ctx.beginPath(); ctx.arc(hx, hy, 6, 0, Math.PI * 2); ctx.fill()
+      ctx.strokeStyle = '#4f8'; ctx.lineWidth = 2
+      ctx.beginPath(); ctx.arc(hx, hy, 6, 0, Math.PI * 2); ctx.stroke()
+
+      // Animated approach point
+      const approachX = 1 + limitAnimT * 1.5
+      const approachY = fx(approachX)
+      if (limitAnimT > 0.01) {
+        const ax = xToCanvas(approachX, xMin, xMax)
+        const ay = yToCanvas(approachY, yMin, yMax)
+        ctx.fillStyle = '#f8c040'
+        ctx.beginPath(); ctx.arc(ax, ay, 5, 0, Math.PI * 2); ctx.fill()
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5
+        ctx.beginPath(); ctx.arc(ax, ay, 5, 0, Math.PI * 2); ctx.stroke()
+
+        // Approach arrows
+        if (approachX > 1.01) {
+          // Right approach
+          ctx.fillStyle = '#f8c040'
+          ctx.font = '12px system-ui'
+          ctx.fillText('x→1⁺', ax + 10, ay - 8)
+        }
+      }
+
+      // Also show left approach
+      const leftX = 1 - limitAnimT * 1.5
+      const leftY = fx(leftX)
+      if (limitAnimT > 0.01 && leftX > xMin) {
+        const lx = xToCanvas(leftX, xMin, xMax)
+        const ly = yToCanvas(leftY, yMin, yMax)
+        ctx.fillStyle = '#f8c040'
+        ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI * 2); ctx.fill()
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5
+        ctx.beginPath(); ctx.arc(lx, ly, 5, 0, Math.PI * 2); ctx.stroke()
+        ctx.fillStyle = '#f8c040'
+        ctx.font = '12px system-ui'
+        ctx.fillText('x→1⁻', lx - 40, ly - 8)
+      }
+
+      // Limit value marker
+      ctx.strokeStyle = 'rgba(248,192,64,0.5)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([4, 4])
+      ctx.beginPath(); ctx.moveTo(0, hy); ctx.lineTo(hx - 8, hy); ctx.stroke()
+      ctx.setLineDash([])
+      ctx.fillStyle = '#f8c040'
+      ctx.font = '11px system-ui'
+      ctx.fillText('L = 2', 6, hy - 6)
+
+      infoPanel.innerHTML = `
+        <span class="formula">f(x) = (x² − 1)/(x − 1)</span> = x + 1 for x ≠ 1<br>
+        <span class="formula">lim_{x→1} f(x)</span> = <span class="value">${limitVal}</span>  
+        (hole at x=1, f(1) is undefined)<br>
+        <span style="color:#666">Left and right limits both approach 2</span>
+      `
+    }
+
+    // ── Render dispatcher ─────────────────────────────────────────────
+    function render() {
+      if (currentTab === 'derivative') drawDerivative()
+      else if (currentTab === 'integral') drawIntegral()
+      else if (currentTab === 'limits') drawLimits()
+    }
+
+    // ── Controls builder ──────────────────────────────────────────────
+    function buildControls() {
+      controlsDiv.innerHTML = ''
+
+      const playBtn = document.createElement('button')
+      playBtn.textContent = playing ? '⏸ Pause' : '▶ Play'
+      playBtn.addEventListener('click', () => {
+        playing = !playing
+        buildControls()
+      })
+      controlsDiv.appendChild(playBtn)
+
+      // Speed buttons
+      ;[0.5, 1, 2].forEach(s => {
+        const btn = document.createElement('button')
+        btn.textContent = `${s}×`
+        btn.className = speed === s ? 'active' : ''
+        btn.addEventListener('click', () => { speed = s; buildControls() })
+        controlsDiv.appendChild(btn)
+      })
+
+      if (currentTab === 'derivative') {
+        // Reset button
+        const reset = document.createElement('button')
+        reset.textContent = '↺ Reset'
+        reset.addEventListener('click', () => { derivX = Math.PI; smoothTime = 0 })
+        controlsDiv.appendChild(reset)
+
+        const hint = document.createElement('span')
+        hint.style.cssText = 'font-size:11px;color:#666;margin-left:8px'
+        hint.textContent = 'Drag the yellow dot'
+        controlsDiv.appendChild(hint)
+      }
+
+      if (currentTab === 'integral') {
+        // Rect count slider
+        const row = document.createElement('div')
+        row.className = 'slider-row'
+        row.innerHTML = `
+          <label>Rectangles</label>
+          <input type="range" id="rectCount" min="1" max="50" value="${integralRectCount}">
+          <span>${integralRectCount}</span>
+        `
+        controlsDiv.appendChild(row)
+        row.querySelector('input').addEventListener('input', (e) => {
+          integralRectCount = Number(e.target.value)
+          row.querySelector('span').textContent = integralRectCount
+        })
+
+        // Method buttons
+        ;['left', 'midpoint', 'right'].forEach(m => {
+          const btn = document.createElement('button')
+          btn.textContent = m
+          btn.className = integralMethod === m ? 'active' : ''
+          btn.addEventListener('click', () => { integralMethod = m; buildControls() })
+          controlsDiv.appendChild(btn)
+        })
+      }
+
+      if (currentTab === 'limits') {
+        // Approach toggle
+        const btn = document.createElement('button')
+        btn.textContent = limitAnimT === 0 ? '▶ Animate' : '↺ Reset'
+        btn.addEventListener('click', () => { limitAnimT = limitAnimT === 0 ? 0.01 : 0 })
+        controlsDiv.appendChild(btn)
+      }
+    }
+
+    // ── Tick loop ─────────────────────────────────────────────────────
+    let lastT = 0
+    function tick(now) {
+      if (lastT === 0) lastT = now
+      const dt = Math.min((now - lastT) / 1000, 0.1)
+      lastT = now
+
+      if (playing) {
+        smoothTime += dt * speed
+
+        if (currentTab === 'derivative') {
+          derivX += dt * 0.3 * speed
+          if (derivX > 2 * Math.PI) derivX = 0
+        }
+        if (currentTab === 'integral') {
+          // slowly increase rect count
+          if (Math.floor(smoothTime * 2) % 5 === 0 && integralRectCount < 50) {
+            // subtle auto-advance for demo
+          }
+        }
+        if (currentTab === 'limits') {
+          if (limitAnimT > 0) {
+            limitAnimT = Math.min(1, limitAnimT + dt * 0.4 * speed)
+          }
+        }
+      }
+
+      render()
+      requestAnimationFrame(tick)
+    }
+
+    // ── Mouse / Touch for draggable point ─────────────────────────────
+    function getCanvasPos(e) {
+      const rect = canvas.getBoundingClientRect()
+      return { x: e.clientX - rect.left, y: e.clientY - rect.top }
+    }
+
+    canvas.addEventListener('mousedown', (e) => {
+      if (currentTab !== 'derivative') return
+      const { x, y } = getCanvasPos(e)
+      const xMin = -0.5, xMax = 2 * Math.PI + 0.5
+      const yMin = -1.8, yMax = 1.8
+      const cx = xToCanvas(derivX, xMin, xMax)
+      const cy = yToCanvas(Math.sin(derivX), yMin, yMax)
+      const dist = Math.hypot(x - cx, y - cy)
+      if (dist < 15) dragDeriv = true
+    })
+
+    canvas.addEventListener('mousemove', (e) => {
+      if (!dragDeriv || currentTab !== 'derivative') return
+      const { x } = getCanvasPos(e)
+      const xMin = -0.5, xMax = 2 * Math.PI + 0.5
+      derivX = Math.max(xMin, Math.min(xMax, xMin + (x / W) * (xMax - xMin)))
+    })
+
+    canvas.addEventListener('mouseup', () => { dragDeriv = false })
+    canvas.addEventListener('mouseleave', () => { dragDeriv = false })
+
+    // Touch support
+    canvas.addEventListener('touchstart', (e) => {
+      if (currentTab !== 'derivative') return
+      const { x, y } = getCanvasPos(e.touches[0])
+      const xMin = -0.5, xMax = 2 * Math.PI + 0.5
+      const yMin = -1.8, yMax = 1.8
+      const cx = xToCanvas(derivX, xMin, xMax)
+      const cy = yToCanvas(Math.sin(derivX), yMin, yMax)
+      if (Math.hypot(x - cx, y - cy) < 20) { dragDeriv = true; e.preventDefault() }
+    }, { passive: false })
+
+    canvas.addEventListener('touchmove', (e) => {
+      if (!dragDeriv || currentTab !== 'derivative') return
+      const { x } = getCanvasPos(e.touches[0])
+      const xMin = -0.5, xMax = 2 * Math.PI + 0.5
+      derivX = Math.max(xMin, Math.min(xMax, xMin + (x / W) * (xMax - xMin)))
+    })
+
+    canvas.addEventListener('touchend', () => { dragDeriv = false })
+
+    // ── Tab switching ─────────────────────────────────────────────────
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentTab = btn.dataset.tab
+        tabButtons.forEach(b => b.classList.remove('active'))
+        btn.classList.add('active')
+        smoothTime = 0
+        buildControls()
+        render()
+      })
+    })
+
+    // ── Init ──────────────────────────────────────────────────────────
+    function resize() {
+      const stage = canvas.parentElement
+      canvas.width = W = stage.clientWidth
+      canvas.height = H = stage.clientHeight
+      render()
+    }
+
+    window.addEventListener('resize', resize)
+    resize()
+    buildControls()
+    requestAnimationFrame(tick)
+
+    console.log('%c📐 Calculus Visualization%c | tabs: derivative, integral, limits', 'color:#4f8', '')
+    console.log('  Controls: play/pause | speed | drag tangent point | sliders')
+    console.log('  blendModes available:', Object.keys(blendModes).join(', '))
+  </script>
+</body>
+</html>

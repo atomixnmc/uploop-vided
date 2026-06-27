@@ -1,0 +1,28 @@
+{
+  "name": "uploop-vided",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "examples/*"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "pnpm run build -ws --if-present",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "@uploop/html": "link:../uploopjs/packages/html"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "vite": "^5.2.0",
+    "vitest": "^1.6.0"
+  },
+  "files": [
+    "dist"
+  ]
+}

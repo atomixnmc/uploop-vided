@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blend Modes — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 24px;
+    }
+    h2 {
+      font-size: 1rem;
+      font-weight: 500;
+      margin-bottom: 12px;
+      color: #aaa;
+    }
+    canvas {
+      border-radius: 12px;
+      background: #151520;
+      margin-bottom: 20px;
+    }
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      max-width: 640px;
+    }
+    .mode-btn {
+      padding: 8px 16px;
+      background: #1a1a2e;
+      color: #ccc;
+      border: 1px solid #333;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-family: inherit;
+      transition: all 0.2s;
+    }
+    .mode-btn:hover { background: #252540; color: #fff; }
+    .mode-btn.active {
+      background: #2a3a2a;
+      border-color: #4f8;
+      color: #4f8;
+    }
+    .info {
+      margin-top: 16px;
+      font-size: 13px;
+      color: #666;
+    }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+    }
+    .back:hover { color: #fff; }
+  </style>
+</head>
+<body>
+  <a href=".." class="back">← Examples</a>
+  <h2>Blend Modes</h2>
+  <canvas id="cnv" width="500" height="400"></canvas>
+  <div class="controls" id="controls"></div>
+  <div class="info">
+    Using <code>blendModes</code> from <code>@uploop/compositor</code>
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

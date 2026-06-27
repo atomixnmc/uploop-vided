@@ -1,0 +1,20 @@
+{
+  "name": "@uploop/cli",
+  "version": "0.1.0",
+  "description": "CLI for uploop-vided — create, edit, render projects",
+  "type": "module",
+  "main": "./src/index.js",
+  "bin": {
+    "uploop-video": "./bin/uploop-video.js"
+  },
+  "exports": { ".": { "import": "./src/index.js" } },
+  "files": ["src", "bin"],
+  "scripts": { "test": "vitest" },
+  "dependencies": {
+    "@uploop/timeline": "workspace:*",
+    "@uploop/compositor": "workspace:*",
+    "@uploop/toolset": "workspace:*",
+    "@uploop/output": "workspace:*",
+    "@uploop/html-video": "workspace:*"
+  }
+}

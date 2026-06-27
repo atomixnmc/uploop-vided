@@ -1,0 +1,614 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Chemistry Molecules — uploop-vided</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                background: #0a0a0f;
+                color: #e0e0e0;
+                font-family: system-ui, sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-height: 100vh;
+                padding: 24px;
+                gap: 16px;
+            }
+            .back {
+                position: fixed;
+                top: 16px;
+                left: 16px;
+                z-index: 10;
+                color: #888;
+                text-decoration: none;
+                font-size: 14px;
+            }
+            .back:hover {
+                color: #fff;
+            }
+            .title-bar {
+                background: #151520;
+                padding: 10px 24px;
+                border-radius: 12px;
+                font-size: 15px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                border: 1px solid #252535;
+            }
+            .main-grid {
+                display: flex;
+                gap: 20px;
+                width: 100%;
+                max-width: 1000px;
+                flex-wrap: wrap;
+                justify-content: center;
+                align-items: flex-start;
+            }
+            canvas {
+                background: #151520;
+                border-radius: 12px;
+                border: 1px solid #252535;
+                cursor: grab;
+                display: block;
+                touch-action: none;
+            }
+            canvas:active {
+                cursor: grabbing;
+            }
+            .panel {
+                background: #151520;
+                border: 1px solid #252535;
+                border-radius: 12px;
+                padding: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 14px;
+                min-width: 240px;
+                max-width: 280px;
+            }
+            .panel h3 {
+                font-size: 16px;
+                margin-bottom: 2px;
+            }
+            .panel p {
+                font-size: 12px;
+                color: #888;
+                line-height: 1.5;
+            }
+            .molecule-select {
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+            }
+            .molecule-select button {
+                background: #1e1e30;
+                color: #e0e0e0;
+                border: 1px solid #333;
+                padding: 10px 14px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 13px;
+                text-align: left;
+                transition: background 0.2s;
+            }
+            .molecule-select button:hover {
+                background: #2a2a40;
+            }
+            .molecule-select button.active {
+                background: #2a3a2a;
+                border-color: #4f8;
+                color: #4f8;
+            }
+            .toggle-row {
+                display: flex;
+                gap: 8px;
+            }
+            .toggle-row button {
+                flex: 1;
+                background: #1e1e30;
+                color: #e0e0e0;
+                border: 1px solid #333;
+                padding: 8px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+            }
+            .toggle-row button.active {
+                background: #2a3a2a;
+                border-color: #4f8;
+                color: #4f8;
+            }
+            .info-box {
+                background: #0f0f1a;
+                border: 1px solid #252535;
+                border-radius: 8px;
+                padding: 12px;
+                font-size: 12px;
+                color: #aaa;
+                line-height: 1.6;
+            }
+            .info-box code {
+                color: #4f8;
+            }
+            .atom-legend {
+                display: flex;
+                gap: 10px;
+                font-size: 11px;
+            }
+            .atom-legend span {
+                display: flex;
+                align-items: center;
+                gap: 4px;
+            }
+            .atom-dot {
+                width: 12px;
+                height: 12px;
+                border-radius: 50%;
+                display: inline-block;
+            }
+        </style>
+    </head>
+    <body>
+        <a href="../.." class="back">← Examples</a>
+        <div class="title-bar">
+            ⚗️ Chemistry Molecules · Ball-and-Stick Models
+        </div>
+
+        <div class="main-grid">
+            <canvas id="canvas" width="520" height="480"></canvas>
+
+            <div class="panel">
+                <h3>Molecular Viewer</h3>
+                <p>
+                    Drag mouse to rotate molecules. Click buttons to switch
+                    between common molecules. Bond angles and atom labels are
+                    shown.
+                </p>
+
+                <div class="molecule-select">
+                    <button data-mol="h2o" class="active">
+                        💧 Water (H₂O)
+                    </button>
+                    <button data-mol="co2">🫧 Carbon Dioxide (CO₂)</button>
+                    <button data-mol="nacl">🧂 Salt (NaCl)</button>
+                </div>
+
+                <div class="toggle-row">
+                    <button id="btn-autorot" class="active">
+                        🔄 Auto-Rotate
+                    </button>
+                    <button id="btn-labels" class="active">🏷️ Labels</button>
+                </div>
+
+                <div class="atom-legend">
+                    <span
+                        ><span class="atom-dot" style="background: #f44"></span>
+                        Oxygen</span
+                    >
+                    <span
+                        ><span class="atom-dot" style="background: #fff"></span>
+                        Hydrogen</span
+                    >
+                    <span
+                        ><span class="atom-dot" style="background: #444"></span>
+                        Carbon</span
+                    >
+                    <span
+                        ><span class="atom-dot" style="background: #aaf"></span>
+                        Sodium</span
+                    >
+                    <span
+                        ><span class="atom-dot" style="background: #3a3"></span>
+                        Chlorine</span
+                    >
+                </div>
+
+                <div class="info-box" id="mol-info">
+                    <strong>Water (H₂O)</strong><br />
+                    H-O-H bond angle: ~104.5°<br />
+                    Polar covalent bonds<br />
+                    Electron: O=1s²2s²2p⁴
+                </div>
+            </div>
+        </div>
+
+        <div class="info-box" style="max-width: 500px; text-align: center">
+            <strong>Ball-and-Stick Model</strong> — Atoms are spheres, bonds are
+            cylinders. Pseudo-3D rendering on Canvas2D with perspective
+            projection and z-sorting. Drag to rotate around Y and X axes.<br />
+            <code>import { easing } from '@uploop/timeline'</code> — used for
+            smooth autorotation
+        </div>
+
+        <script type="module">
+            import { easing } from "@uploop/timeline";
+            import { blendModes } from "@uploop/compositor";
+
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+
+            // ── Atom colors ───────────────────────────────────────────────────
+            const atomColors = {
+                O: "#ff4444",
+                H: "#ffffff",
+                C: "#404040",
+                Na: "#aaaaff",
+                Cl: "#44cc44",
+            };
+            const atomRadii = {
+                O: 18,
+                H: 12,
+                C: 16,
+                Na: 20,
+                Cl: 22,
+            };
+
+            // ── Molecule definitions (relative 3D coords) ────────────────────
+            const molecules = {
+                h2o: {
+                    name: "Water (H₂O)",
+                    atoms: [
+                        { element: "O", x: 0, y: 0, z: 0 },
+                        { element: "H", x: 0.757, y: 0.586, z: 0 },
+                        { element: "H", x: -0.757, y: 0.586, z: 0 },
+                    ],
+                    bonds: [
+                        [0, 1],
+                        [0, 2],
+                    ],
+                    bondAngle: "104.5°",
+                    description: "Polar covalent bonds\nElectron: O=1s²2s²2p⁴",
+                },
+                co2: {
+                    name: "Carbon Dioxide (CO₂)",
+                    atoms: [
+                        { element: "C", x: 0, y: 0, z: 0 },
+                        { element: "O", x: 1.16, y: 0, z: 0 },
+                        { element: "O", x: -1.16, y: 0, z: 0 },
+                    ],
+                    bonds: [
+                        [0, 1],
+                        [0, 2],
+                    ],
+                    bondAngle: "180° (linear)",
+                    description: "Double bonds O=C=O\nElectron: C=1s²2s²2p²",
+                },
+                nacl: {
+                    name: "Salt (NaCl)",
+                    atoms: [
+                        { element: "Na", x: 0, y: 0, z: 0 },
+                        { element: "Cl", x: 0, y: 0, z: 1.5 },
+                    ],
+                    bonds: [[0, 1]],
+                    bondAngle: "— (ionic bond)",
+                    description:
+                        "Ionic bond Na⁺Cl⁻\nElectron: Na=1s²2s²2p⁶3s¹\nElectron: Cl=1s²2s²2p⁶3s²3p⁵",
+                },
+            };
+
+            let currentMol = "h2o";
+            let autoRotate = true;
+            let showLabels = true;
+            let rotY = 0.5;
+            let rotX = 0.3;
+            let targetRotY = rotY;
+            let targetRotX = rotX;
+
+            // ── Mouse drag ────────────────────────────────────────────────────
+            let dragging = false;
+            let dragStartX = 0;
+            let dragStartY = 0;
+            let dragStartRotY = 0;
+            let dragStartRotX = 0;
+
+            canvas.addEventListener("mousedown", (e) => {
+                dragging = true;
+                autoRotate = false;
+                document
+                    .getElementById("btn-autorot")
+                    .classList.remove("active");
+                dragStartX = e.clientX;
+                dragStartY = e.clientY;
+                dragStartRotY = targetRotY;
+                dragStartRotX = targetRotX;
+            });
+            canvas.addEventListener("mousemove", (e) => {
+                if (!dragging) return;
+                const dx = e.clientX - dragStartX;
+                const dy = e.clientY - dragStartY;
+                targetRotY = dragStartRotY + dx * 0.008;
+                targetRotX = dragStartRotX + dy * 0.008;
+                targetRotX = Math.max(
+                    -Math.PI / 2,
+                    Math.min(Math.PI / 2, targetRotX),
+                );
+            });
+            canvas.addEventListener("mouseup", () => {
+                dragging = false;
+            });
+            canvas.addEventListener("mouseleave", () => {
+                dragging = false;
+            });
+
+            // Touch
+            canvas.addEventListener(
+                "touchstart",
+                (e) => {
+                    dragging = true;
+                    autoRotate = false;
+                    document
+                        .getElementById("btn-autorot")
+                        .classList.remove("active");
+                    dragStartX = e.touches[0].clientX;
+                    dragStartY = e.touches[0].clientY;
+                    dragStartRotY = targetRotY;
+                    dragStartRotX = targetRotX;
+                },
+                { passive: true },
+            );
+            canvas.addEventListener(
+                "touchmove",
+                (e) => {
+                    if (!dragging) return;
+                    const dx = e.touches[0].clientX - dragStartX;
+                    const dy = e.touches[0].clientY - dragStartY;
+                    targetRotY = dragStartRotY + dx * 0.008;
+                    targetRotX = dragStartRotX + dy * 0.008;
+                    targetRotX = Math.max(
+                        -Math.PI / 2,
+                        Math.min(Math.PI / 2, targetRotX),
+                    );
+                },
+                { passive: true },
+            );
+            canvas.addEventListener("touchend", () => {
+                dragging = false;
+            });
+
+            // ── 3D rotation helpers ──────────────────────────────────────────
+            function rotateY(p, angle) {
+                const cos = Math.cos(angle),
+                    sin = Math.sin(angle);
+                return {
+                    x: p.x * cos + p.z * sin,
+                    y: p.y,
+                    z: -p.x * sin + p.z * cos,
+                };
+            }
+            function rotateX(p, angle) {
+                const cos = Math.cos(angle),
+                    sin = Math.sin(angle);
+                return {
+                    x: p.x,
+                    y: p.y * cos - p.z * sin,
+                    z: p.y * sin + p.z * cos,
+                };
+            }
+
+            function project(p, cx, cy, scale) {
+                const persp = 400 / (400 + p.z * scale);
+                return {
+                    x: cx + p.x * scale * persp,
+                    y: cy - p.y * scale * persp,
+                    z: p.z,
+                };
+            }
+
+            // ── Draw ──────────────────────────────────────────────────────────
+            function draw() {
+                const w = canvas.width;
+                const h = canvas.height;
+                const cx = w / 2;
+                const cy = h / 2;
+                const scale = 140;
+                const mol = molecules[currentMol];
+
+                ctx.clearRect(0, 0, w, h);
+
+                // Transform atoms
+                const transformed = mol.atoms.map((a) => {
+                    let p = { x: a.x, y: a.y, z: a.z };
+                    p = rotateY(p, rotY);
+                    p = rotateX(p, rotX);
+                    return { ...a, ...project(p, cx, cy, scale), worldZ: p.z };
+                });
+
+                // Collect objects to z-sort
+                const objects = [];
+
+                // Bonds (cylinders)
+                for (const [i, j] of mol.bonds) {
+                    const a = transformed[i],
+                        b = transformed[j];
+                    const midX = (a.x + b.x) / 2;
+                    const midY = (a.y + b.y) / 2;
+                    const midZ = (a.worldZ + b.worldZ) / 2;
+                    const len = Math.sqrt((b.x - a.x) ** 2 + (b.y - a.y) ** 2);
+                    objects.push({
+                        type: "bond",
+                        a,
+                        b,
+                        midX,
+                        midY,
+                        midZ,
+                        len,
+                        z: midZ,
+                    });
+                }
+
+                // Atoms
+                for (const a of transformed) {
+                    objects.push({ type: "atom", ...a, z: a.worldZ });
+                }
+
+                // Sort by z (back to front)
+                objects.sort((a, b) => b.z - a.z);
+
+                for (const obj of objects) {
+                    if (obj.type === "bond") {
+                        const dx = obj.b.x - obj.a.x;
+                        const dy = obj.b.y - obj.a.y;
+                        const angle = Math.atan2(dy, dx);
+                        const thickness = 5;
+
+                        ctx.save();
+                        ctx.translate(obj.a.x, obj.a.y);
+                        ctx.rotate(angle);
+                        ctx.strokeStyle = "#888";
+                        ctx.lineWidth = thickness;
+                        ctx.lineCap = "round";
+                        ctx.beginPath();
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(obj.len, 0);
+                        ctx.stroke();
+                        ctx.restore();
+                    } else {
+                        const r = atomRadii[obj.element] || 14;
+                        const color = atomColors[obj.element] || "#888";
+
+                        // Sphere with lighting
+                        const grad = ctx.createRadialGradient(
+                            obj.x - r * 0.3,
+                            obj.y - r * 0.3,
+                            r * 0.1,
+                            obj.x,
+                            obj.y,
+                            r,
+                        );
+                        grad.addColorStop(0, lighten(color, 0.5));
+                        grad.addColorStop(0.7, color);
+                        grad.addColorStop(1, darken(color, 0.5));
+
+                        ctx.fillStyle = grad;
+                        ctx.beginPath();
+                        ctx.arc(obj.x, obj.y, r, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // Outline
+                        ctx.strokeStyle = darken(color, 0.3);
+                        ctx.lineWidth = 1.5;
+                        ctx.stroke();
+
+                        // Label
+                        if (showLabels) {
+                            ctx.fillStyle = "#fff";
+                            ctx.font = "bold 13px system-ui";
+                            ctx.textAlign = "center";
+                            ctx.textBaseline = "middle";
+                            ctx.fillText(obj.element, obj.x, obj.y);
+                        }
+                    }
+                }
+
+                // Bond angle annotation for H2O
+                if (currentMol === "h2o" && showLabels) {
+                    const o = transformed[0];
+                    const h1 = transformed[1];
+                    const h2 = transformed[2];
+                    const midAng =
+                        (Math.atan2(h1.y - o.y, h1.x - o.x) +
+                            Math.atan2(h2.y - o.y, h2.x - o.x)) /
+                        2;
+                    const labelR = 30;
+                    const lx = o.x + Math.cos(midAng) * labelR + 20;
+                    const ly = o.y + Math.sin(midAng) * labelR;
+                    ctx.fillStyle = "rgba(255,255,100,0.9)";
+                    ctx.font = "12px system-ui";
+                    ctx.textAlign = "center";
+                    ctx.fillText("104.5°", lx, ly);
+                }
+                if (currentMol === "co2" && showLabels) {
+                    ctx.fillStyle = "rgba(255,255,100,0.9)";
+                    ctx.font = "12px system-ui";
+                    ctx.textAlign = "center";
+                    const c = transformed[0];
+                    ctx.fillText("180°", c.x, c.y - 30);
+                }
+            }
+
+            function lighten(hex, factor) {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                const lr = Math.min(255, Math.round(r + (255 - r) * factor));
+                const lg = Math.min(255, Math.round(g + (255 - g) * factor));
+                const lb = Math.min(255, Math.round(b + (255 - b) * factor));
+                return `rgb(${lr},${lg},${lb})`;
+            }
+            function darken(hex, factor) {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                const dr = Math.round(r * (1 - factor));
+                const dg = Math.round(g * (1 - factor));
+                const db = Math.round(b * (1 - factor));
+                return `rgb(${dr},${dg},${db})`;
+            }
+
+            // ── Controls ──────────────────────────────────────────────────────
+            document
+                .querySelectorAll(".molecule-select button")
+                .forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        currentMol = btn.dataset.mol;
+                        document
+                            .querySelectorAll(".molecule-select button")
+                            .forEach((b) => b.classList.remove("active"));
+                        btn.classList.add("active");
+                        const mol = molecules[currentMol];
+                        document.getElementById("mol-info").innerHTML =
+                            `<strong>${mol.name}</strong><br>Bond angle: ${mol.bondAngle}<br>${mol.description.replace(/\n/g, "<br>")}`;
+                    });
+                });
+
+            document
+                .getElementById("btn-autorot")
+                .addEventListener("click", function () {
+                    autoRotate = !autoRotate;
+                    this.classList.toggle("active", autoRotate);
+                });
+
+            document
+                .getElementById("btn-labels")
+                .addEventListener("click", function () {
+                    showLabels = !showLabels;
+                    this.classList.toggle("active", showLabels);
+                });
+
+            // ── Loop ──────────────────────────────────────────────────────────
+            let lastTime = performance.now();
+            function loop(t) {
+                const dt = Math.min((t - lastTime) / 1000, 0.1);
+                lastTime = t;
+
+                if (autoRotate) {
+                    targetRotY += dt * 0.6;
+                }
+
+                // Smooth rotation using easing
+                rotY += (targetRotY - rotY) * easing.easeOutCubic(dt * 10);
+                rotX += (targetRotX - rotX) * easing.easeOutCubic(dt * 10);
+
+                draw();
+                requestAnimationFrame(loop);
+            }
+            requestAnimationFrame(loop);
+
+            console.log(
+                "%c⚗️ Chemistry Molecules%c | Ball-and-stick 3D viewer",
+                "color:#4f8",
+                "",
+            );
+            console.log(
+                "  Drag to rotate | Click molecule buttons | Toggle auto-rotate/ labels",
+            );
+        </script>
+    </body>
+</html>

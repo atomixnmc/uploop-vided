@@ -1,0 +1,23 @@
+{
+  "name": "@uploop/toolset",
+  "version": "0.1.0",
+  "description": "Uploop AI toolset — MCP-style tool registry + OpenAI-compatible advisor resource",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@uploop/compositor": "workspace:*",
+    "@uploop/timeline": "workspace:*",
+    "@uploop/output": "workspace:*"
+  }
+}

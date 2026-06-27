@@ -1,0 +1,677 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wave Propagation — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 24px 40px;
+      gap: 14px;
+    }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+      z-index: 100;
+    }
+    .back:hover { color: #fff; }
+    .title-bar {
+      width: min(900px, 90vw);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .title-bar h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #4f8;
+    }
+    .title-bar span { font-size: 12px; color: #666; }
+    .tabs {
+      display: flex;
+      gap: 4px;
+    }
+    .tabs button {
+      background: #151520;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 8px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .tabs button:hover { background: #1e1e30; }
+    .tabs button.active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .stage {
+      width: min(900px, 90vw);
+      height: min(420px, 50vh);
+      background: #151520;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    .stage canvas { width: 100%; height: 100%; display: block; }
+    .controls-panel {
+      width: min(900px, 90vw);
+      background: #151520;
+      border-radius: 10px;
+      padding: 16px 20px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 100px;
+      flex: 1;
+      max-width: 150px;
+    }
+    .control-group label {
+      font-size: 11px;
+      color: #888;
+    }
+    .control-group .value-display {
+      font-size: 11px;
+      color: #4f8;
+      font-family: 'Courier New', monospace;
+    }
+    .control-group input[type="range"] {
+      width: 100%;
+      accent-color: #4f8;
+    }
+    .controls-panel button {
+      background: #1e1e30;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 8px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .controls-panel button:hover { background: #2a2a40; }
+    .controls-panel button.active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .info-panel {
+      width: min(900px, 90vw);
+      background: #151520;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: #aaa;
+      line-height: 1.5;
+      min-height: 42px;
+    }
+    .info-panel .formula {
+      color: #4f8;
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+    }
+    .info-panel .value { color: #f8c040; font-weight: 600; }
+    .legend {
+      display: flex;
+      gap: 14px;
+      width: min(900px, 90vw);
+      flex-wrap: wrap;
+    }
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: #888;
+    }
+    .legend .swatch {
+      width: 16px; height: 3px;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+
+  <div class="title-bar">
+    <h1>🌊 Wave Propagation</h1>
+    <span>Sine waves · Interference · Standing waves</span>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="sine" class="active">Sine Wave</button>
+    <button data-tab="interference">Interference</button>
+    <button data-tab="standing">Standing Wave</button>
+  </div>
+
+  <div class="stage">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="controls-panel" id="controlsPanel"></div>
+
+  <div class="info-panel" id="info"></div>
+  <div class="legend" id="legend">
+    <span><span class="swatch" style="background:#4f8"></span> Wave 1</span>
+    <span><span class="swatch" style="background:#4fc8ff"></span> Wave 2</span>
+    <span><span class="swatch" style="background:#f8c040"></span> Resultant</span>
+  </div>
+
+  <script type="module">
+    import { easing } from '@uploop/timeline'
+    import { blendModes } from '@uploop/compositor'
+
+    const canvas = document.getElementById('canvas')
+    const ctx = canvas.getContext('2d')
+    const infoPanel = document.getElementById('info')
+    const controlsPanel = document.getElementById('controlsPanel')
+    const legendDiv = document.getElementById('legend')
+    const tabButtons = document.querySelectorAll('.tabs button')
+
+    let W, H, currentTab = 'sine'
+
+    // ── Sine wave state ───────────────────────────────────────────────
+    let freq1 = 1.5
+    let amp1 = 80
+    let phase1 = 0
+    let waveSpeed1 = 1
+
+    // ── Interference state ────────────────────────────────────────────
+    let freq2 = 1.8
+    let amp2 = 60
+    let phase2 = 0
+    let phaseDiff = 0 // phase difference between wave 1 and wave 2
+
+    // ── Standing wave state ───────────────────────────────────────────
+    let standingFreq = 2
+    let standingAmp = 80
+    let standingHarmonic = 1 // harmonic number (n=1: fundamental)
+    let showForward = true
+    let showReflected = true
+
+    // Playback
+    let playing = true
+    let time = 0
+
+    // ── Drawing helpers ───────────────────────────────────────────────
+    function drawGrid() {
+      ctx.strokeStyle = '#1a1a28'
+      ctx.lineWidth = 0.5
+      const gs = 40
+      for (let x = gs; x < W; x += gs) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
+      }
+      for (let y = gs; y < H; y += gs) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+      }
+
+      // Center line
+      const cy = H / 2
+      ctx.strokeStyle = '#333'
+      ctx.lineWidth = 1
+      ctx.setLineDash([4, 6])
+      ctx.beginPath()
+      ctx.moveTo(0, cy)
+      ctx.lineTo(W, cy)
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
+
+    function drawWave(fn, color, width, dashed) {
+      ctx.strokeStyle = color
+      ctx.lineWidth = width || 2
+      if (dashed) ctx.setLineDash([4, 4])
+      ctx.beginPath()
+      for (let px = 0; px <= W; px++) {
+        const x = px
+        const y = fn(px)
+        px === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)
+      }
+      ctx.stroke()
+      ctx.setLineDash([])
+    }
+
+    function fillWave(fn, color, alpha) {
+      const cy = H / 2
+      ctx.fillStyle = color.replace(')', `,${alpha})`).replace('rgb', 'rgba')
+      ctx.beginPath()
+      ctx.moveTo(0, cy)
+      for (let px = 0; px <= W; px++) {
+        ctx.lineTo(px, fn(px))
+      }
+      ctx.lineTo(W, cy)
+      ctx.closePath()
+      ctx.fill()
+    }
+
+    // ── Sine Wave Tab ─────────────────────────────────────────────────
+    function drawSineWave() {
+      ctx.clearRect(0, 0, W, H)
+      drawGrid()
+
+      const cy = H / 2
+      const scaleX = (freq1 * 2 * Math.PI) / W
+
+      const waveFn = (px) => {
+        return cy - amp1 * Math.sin(px * scaleX - time * waveSpeed1 * 3 + phase1 * Math.PI)
+      }
+
+      // Fill under wave
+      fillWave(waveFn, 'rgb(79,255,136)', 0.12)
+
+      drawWave(waveFn, '#4f8', 2.5)
+
+      // Annotate wavelength
+      const wavelength = (2 * Math.PI) / scaleX
+      const startX = 30
+      const endX = startX + wavelength
+      if (endX < W - 30) {
+        const yAt = cy - 20
+        ctx.strokeStyle = '#f8c040'
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([3, 3])
+        ctx.beginPath()
+        ctx.moveTo(startX, yAt)
+        ctx.lineTo(endX, yAt)
+        ctx.stroke()
+        // Arrows at ends
+        ctx.setLineDash([])
+        ctx.beginPath()
+        ctx.moveTo(startX, yAt)
+        ctx.lineTo(startX + 8, yAt - 4)
+        ctx.lineTo(startX + 8, yAt + 4)
+        ctx.fillStyle = '#f8c040'
+        ctx.fill()
+        ctx.beginPath()
+        ctx.moveTo(endX, yAt)
+        ctx.lineTo(endX - 8, yAt - 4)
+        ctx.lineTo(endX - 8, yAt + 4)
+        ctx.fill()
+        ctx.fillStyle = '#f8c040'
+        ctx.font = '12px system-ui'
+        ctx.textAlign = 'center'
+        ctx.fillText('λ', (startX + endX) / 2, yAt - 8)
+      }
+
+      // Amplitude marker
+      const markerX = W - 40
+      const topY = cy - amp1
+      ctx.strokeStyle = '#4fc8ff'
+      ctx.lineWidth = 1
+      ctx.setLineDash([3, 4])
+      ctx.beginPath()
+      ctx.moveTo(markerX, topY)
+      ctx.lineTo(markerX, cy)
+      ctx.stroke()
+      ctx.setLineDash([])
+      ctx.fillStyle = '#4fc8ff'
+      ctx.font = '11px system-ui'
+      ctx.textAlign = 'left'
+      ctx.fillText('A', markerX + 6, (topY + cy) / 2 + 4)
+
+      // Labels
+      ctx.fillStyle = '#888'
+      ctx.font = '12px system-ui'
+      ctx.textAlign = 'center'
+      ctx.fillText(`f = ${freq1.toFixed(1)} Hz`, 60, 24)
+      ctx.fillText(`λ = ${(W / freq1).toFixed(0)} px`, 60, 40)
+
+      infoPanel.innerHTML = `
+        <span class="formula">y(x,t) = A·sin(kx − ωt + φ)</span><br>
+        f = <span class="value">${freq1.toFixed(1)} Hz</span>  
+        A = <span class="value">${amp1.toFixed(0)} px</span>  
+        φ = <span class="value">${phase1.toFixed(2)}π</span>  
+        ω = <span class="value">${(freq1 * 2 * Math.PI).toFixed(1)} rad/s</span>
+      `
+      legendDiv.innerHTML = `
+        <span><span class="swatch" style="background:#4f8"></span> y(x,t)</span>
+        <span><span class="swatch" style="background:rgba(79,255,136,0.15)"></span> Displacement fill</span>
+      `
+    }
+
+    // ── Interference Tab ──────────────────────────────────────────────
+    function drawInterference() {
+      ctx.clearRect(0, 0, W, H)
+      drawGrid()
+
+      const cy = H / 2
+      const scaleX1 = (freq1 * 2 * Math.PI) / W
+      const scaleX2 = (freq2 * 2 * Math.PI) / W
+      const t = time * 3
+
+      const wave1Fn = (px) => cy - amp1 * Math.sin(px * scaleX1 - t * waveSpeed1 + phase1 * Math.PI)
+      const wave2Fn = (px) => cy - amp2 * Math.sin(px * scaleX2 - t * 0.9 + (phase1 + phaseDiff) * Math.PI)
+      const sumFn = (px) => {
+        const y1 = amp1 * Math.sin(px * scaleX1 - t * waveSpeed1 + phase1 * Math.PI)
+        const y2 = amp2 * Math.sin(px * scaleX2 - t * 0.9 + (phase1 + phaseDiff) * Math.PI)
+        return cy - (y1 + y2)
+      }
+
+      drawWave(wave1Fn, '#4f8', 1.5, true)
+      drawWave(wave2Fn, '#4fc8ff', 1.5, true)
+      drawWave(sumFn, '#f8c040', 2.5)
+
+      // Mark constructive/destructive interference regions
+      for (let px = 20; px < W - 20; px += 30) {
+        const y1 = amp1 * Math.sin(px * scaleX1 - t * waveSpeed1 + phase1 * Math.PI)
+        const y2 = amp2 * Math.sin(px * scaleX2 - t * 0.9 + (phase1 + phaseDiff) * Math.PI)
+        const sum = y1 + y2
+        const maxPossible = amp1 + amp2
+        const ratio = Math.abs(sum) / maxPossible
+
+        if (ratio > 0.85) {
+          // Constructive
+          ctx.fillStyle = 'rgba(79,255,136,0.4)'
+          ctx.font = '10px system-ui'
+          ctx.textAlign = 'center'
+          ctx.fillText('✓', px, cy - sum - 12)
+        } else if (ratio < 0.15) {
+          // Destructive
+          ctx.fillStyle = 'rgba(255,100,100,0.4)'
+          ctx.font = '10px system-ui'
+          ctx.textAlign = 'center'
+          ctx.fillText('✗', px, cy - sum - 12)
+        }
+      }
+
+      infoPanel.innerHTML = `
+        <span class="formula">y(x,t) = A₁sin(k₁x−ωt) + A₂sin(k₂x−ωt+Δφ)</span><br>
+        Wave 1: f₁=<span class="value">${freq1.toFixed(1)}Hz</span>, A₁=<span class="value">${amp1.toFixed(0)}</span>  
+        Wave 2: f₂=<span class="value">${freq2.toFixed(1)}Hz</span>, A₂=<span class="value">${amp2.toFixed(0)}</span><br>
+        Δφ = <span class="value">${phaseDiff.toFixed(2)}π</span>  
+        <span style="color:#4f8">✓ constructive</span> / <span style="color:#ff6464">✗ destructive</span>
+      `
+    }
+
+    // ── Standing Wave Tab ─────────────────────────────────────────────
+    function drawStandingWave() {
+      ctx.clearRect(0, 0, W, H)
+      drawGrid()
+
+      const cy = H / 2
+      const k = standingFreq * 2 * Math.PI / W
+      const t = time * 3
+
+      // Standing wave: y(x,t) = 2A sin(kx) cos(ωt)
+      // Or more precisely: forward + reflected = A sin(kx - ωt) + A sin(kx + ωt) = 2A sin(kx) cos(ωt)
+      const standingFn = (px) => {
+        const y = 2 * standingAmp * Math.sin(px * k) * Math.cos(t * waveSpeed1)
+        return cy - y
+      }
+
+      if (showForward) {
+        const fwdFn = (px) => cy - standingAmp * Math.sin(px * k - t * waveSpeed1)
+        drawWave(fwdFn, '#4fc8ff', 1.2, true)
+      }
+      if (showReflected) {
+        const refFn = (px) => cy - standingAmp * Math.sin(px * k + t * waveSpeed1)
+        drawWave(refFn, '#ff8c50', 1.2, true)
+      }
+
+      // Standing wave envelope (max amplitude: ±2A)
+      const envTop = (px) => cy - 2 * standingAmp * Math.abs(Math.sin(px * k))
+      const envBot = (px) => cy + 2 * standingAmp * Math.abs(Math.sin(px * k))
+
+      ctx.strokeStyle = 'rgba(248,192,64,0.2)'
+      ctx.lineWidth = 1
+      ctx.setLineDash([2, 6])
+      ctx.beginPath()
+      for (let px = 0; px <= W; px++) {
+        const y = envTop(px)
+        px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y)
+      }
+      ctx.stroke()
+      ctx.beginPath()
+      for (let px = 0; px <= W; px++) {
+        const y = envBot(px)
+        px === 0 ? ctx.moveTo(px, y) : ctx.lineTo(px, y)
+      }
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      drawWave(standingFn, '#f8c040', 3)
+
+      // Mark nodes and antinodes
+      // Nodes at positions where sin(kx) = 0 => kx = nπ => x = nπ/k = n * W / (2*standingFreq)
+      const nodeSpacing = W / (2 * standingFreq)
+      for (let n = 0; n <= 2 * standingFreq; n++) {
+        const x = n * nodeSpacing
+        if (x > 10 && x < W - 10) {
+          // Check if node or antinode
+          const sinVal = Math.sin(x * k)
+          if (Math.abs(sinVal) < 0.05) {
+            // Node
+            ctx.fillStyle = '#ff4060'
+            ctx.beginPath()
+            ctx.arc(x, cy, 5, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.fillStyle = '#ff4060'
+            ctx.font = '10px system-ui'
+            ctx.textAlign = 'center'
+            ctx.fillText('N', x, cy - 14)
+          } else if (Math.abs(Math.abs(sinVal) - 1) < 0.05) {
+            // Antinode
+            ctx.fillStyle = '#4f8'
+            ctx.beginPath()
+            ctx.arc(x, cy, 5, 0, Math.PI * 2)
+            ctx.fill()
+            ctx.fillStyle = '#4f8'
+            ctx.font = '10px system-ui'
+            ctx.textAlign = 'center'
+            ctx.fillText('A', x, cy - 14)
+          }
+        }
+      }
+
+      // Boundary markers
+      ctx.strokeStyle = '#666'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.moveTo(8, cy - 40)
+      ctx.lineTo(8, cy + 40)
+      ctx.stroke()
+      ctx.beginPath()
+      ctx.moveTo(W - 8, cy - 40)
+      ctx.lineTo(W - 8, cy + 40)
+      ctx.stroke()
+
+      const period = 2 * Math.PI / waveSpeed1
+      const wavelength = W / standingFreq
+
+      infoPanel.innerHTML = `
+        <span class="formula">y(x,t) = 2A·sin(kx)·cos(ωt)</span> (standing wave)<br>
+        = A·sin(kx−ωt) + A·sin(kx+ωt) (forward + reflected)<br>
+        λ = <span class="value">${wavelength.toFixed(0)}px</span>  
+        Nodes: <span class="value">${2 * standingFreq + 1}</span>  
+        T = <span class="value">${period.toFixed(1)}s</span><br>
+        <span style="color:#888">Red = node (zero displacement) · Green = antinode (max displacement)</span>
+      `
+      legendDiv.innerHTML = `
+        <span><span class="swatch" style="background:#4fc8ff"></span> Forward wave</span>
+        <span><span class="swatch" style="background:#ff8c50"></span> Reflected wave</span>
+        <span><span class="swatch" style="background:#f8c040"></span> Standing wave (sum)</span>
+      `
+    }
+
+    // ── Render & controls ─────────────────────────────────────────────
+    function render() {
+      if (currentTab === 'sine') drawSineWave()
+      else if (currentTab === 'interference') drawInterference()
+      else if (currentTab === 'standing') drawStandingWave()
+    }
+
+    function buildControls() {
+      controlsPanel.innerHTML = ''
+
+      const playBtn = document.createElement('button')
+      playBtn.id = 'playBtn'
+      playBtn.textContent = playing ? '⏸ Pause' : '▶ Play'
+      playBtn.addEventListener('click', () => {
+        playing = !playing
+        playBtn.textContent = playing ? '⏸ Pause' : '▶ Play'
+      })
+      controlsPanel.appendChild(playBtn)
+
+      if (currentTab === 'sine') {
+        ;[
+          { id: 'freq1', label: 'Frequency', min: '0.5', max: '5', step: '0.1', val: freq1, unit: 'Hz', fmt: v => v.toFixed(1), set: v => { freq1 = v } },
+          { id: 'amp1', label: 'Amplitude', min: '20', max: '160', step: '5', val: amp1, unit: 'px', fmt: v => v.toFixed(0), set: v => { amp1 = v } },
+          { id: 'phase1', label: 'Phase', min: '0', max: '2', step: '0.05', val: phase1, unit: 'π', fmt: v => v.toFixed(2), set: v => { phase1 = v } },
+          { id: 'speed1', label: 'Speed', min: '0', max: '3', step: '0.1', val: waveSpeed1, unit: '×', fmt: v => v.toFixed(1), set: v => { waveSpeed1 = v } },
+        ].forEach(({ id, label, min, max, step, val, unit, fmt, set }) => {
+          const grp = document.createElement('div')
+          grp.className = 'control-group'
+          grp.innerHTML = `<label>${label} <span class="value-display">${fmt(val)}${unit}</span></label>
+            <input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}">`
+          controlsPanel.appendChild(grp)
+          grp.querySelector('input').addEventListener('input', function() {
+            const v = Number(this.value)
+            set(v)
+            grp.querySelector('.value-display').textContent = `${fmt(v)}${unit}`
+          })
+        })
+      }
+
+      if (currentTab === 'interference') {
+        ;[
+          { id: 'freq1_i', label: 'f₁', min: '0.5', max: '5', step: '0.1', val: freq1, set: v => { freq1 = v } },
+          { id: 'amp1_i', label: 'A₁', min: '20', max: '140', step: '5', val: amp1, set: v => { amp1 = v } },
+          { id: 'freq2_i', label: 'f₂', min: '0.5', max: '5', step: '0.1', val: freq2, set: v => { freq2 = v } },
+          { id: 'amp2_i', label: 'A₂', min: '20', max: '140', step: '5', val: amp2, set: v => { amp2 = v } },
+          { id: 'phaseDiff', label: 'Δφ', min: '0', max: '2', step: '0.05', val: phaseDiff, set: v => { phaseDiff = v } },
+        ].forEach(({ id, label, min, max, step, val, set }) => {
+          const grp = document.createElement('div')
+          grp.className = 'control-group'
+          grp.innerHTML = `<label>${label} <span class="value-display">${val.toFixed(2)}</span></label>
+            <input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}">`
+          controlsPanel.appendChild(grp)
+          grp.querySelector('input').addEventListener('input', function() {
+            const v = Number(this.value)
+            set(v)
+            grp.querySelector('.value-display').textContent = v.toFixed(2)
+          })
+        })
+
+        // Preset buttons
+        const presetRow = document.createElement('div')
+        presetRow.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap'
+        ;[
+          { label: 'Identical', f2: freq1, a2: amp1, pd: 0 },
+          { label: 'Δφ=π/2', f2: freq1, a2: amp1, pd: 0.5 },
+          { label: 'Δφ=π', f2: freq1, a2: amp1, pd: 1 },
+          { label: 'Beat (f₂=1.1f₁)', f2: freq1 * 1.1, a2: amp1, pd: 0 },
+          { label: 'Harmonic', f2: freq1 * 2, a2: amp1 * 0.5, pd: 0 },
+        ].forEach(preset => {
+          const btn = document.createElement('button')
+          btn.textContent = preset.label
+          btn.style.cssText = 'font-size:11px;padding:5px 10px'
+          btn.addEventListener('click', () => {
+            freq2 = preset.f2; amp2 = preset.a2; phaseDiff = preset.pd
+            buildControls()
+          })
+          presetRow.appendChild(btn)
+        })
+        controlsPanel.appendChild(presetRow)
+      }
+
+      if (currentTab === 'standing') {
+        ;[
+          { id: 'standFreq', label: 'Frequency', min: '0.5', max: '4', step: '0.5', val: standingFreq, set: v => { standingFreq = v } },
+          { id: 'standAmp', label: 'Amplitude', min: '20', max: '140', step: '5', val: standingAmp, set: v => { standingAmp = v } },
+        ].forEach(({ id, label, min, max, step, val, set }) => {
+          const grp = document.createElement('div')
+          grp.className = 'control-group'
+          grp.innerHTML = `<label>${label} <span class="value-display">${val.toFixed(1)}</span></label>
+            <input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${val}">`
+          controlsPanel.appendChild(grp)
+          grp.querySelector('input').addEventListener('input', function() {
+            const v = Number(this.value)
+            set(v)
+            grp.querySelector('.value-display').textContent = v.toFixed(1)
+          })
+        })
+
+        // Toggle buttons
+        ;[
+          { id: 'showFwd', label: 'Forward', get: () => showForward, set: () => { showForward = !showForward } },
+          { id: 'showRef', label: 'Reflected', get: () => showReflected, set: () => { showReflected = !showReflected } },
+        ].forEach(({ id, label, get, set }) => {
+          const btn = document.createElement('button')
+          btn.textContent = label
+          btn.className = get() ? 'active' : ''
+          btn.addEventListener('click', () => { set(); btn.classList.toggle('active') })
+          controlsPanel.appendChild(btn)
+        })
+
+        // Harmonic presets
+        ;[1, 2, 3].forEach(n => {
+          const btn = document.createElement('button')
+          btn.textContent = `n=${n}`
+          btn.className = standingFreq === n / 2 ? 'active' : ''
+          btn.addEventListener('click', () => {
+            standingFreq = n / 2
+            buildControls()
+          })
+          controlsPanel.appendChild(btn)
+        })
+      }
+    }
+
+    // ── Tab switching ─────────────────────────────────────────────────
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentTab = btn.dataset.tab
+        tabButtons.forEach(b => b.classList.remove('active'))
+        btn.classList.add('active')
+        time = 0
+        buildControls()
+        render()
+      })
+    })
+
+    // ── Tick loop ─────────────────────────────────────────────────────
+    let lastT = 0
+    function tick(now) {
+      if (lastT === 0) lastT = now
+      const dt = Math.min((now - lastT) / 1000, 0.1)
+      lastT = now
+
+      if (playing) {
+        time += dt * 0.6
+      }
+
+      render()
+      requestAnimationFrame(tick)
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────
+    function resize() {
+      const stage = canvas.parentElement
+      canvas.width = W = stage.clientWidth
+      canvas.height = H = stage.clientHeight
+      render()
+    }
+
+    window.addEventListener('resize', resize)
+    resize()
+    buildControls()
+    requestAnimationFrame(tick)
+
+    console.log('%c🌊 Wave Propagation%c | sine, interference, standing', 'color:#4f8', '')
+    console.log('  Controls: tabs | play/pause | sliders for all params | presets')
+    console.log('  Using @uploop/timeline easing & @uploop/compositor blendModes')
+  </script>
+</body>
+</html>

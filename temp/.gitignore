@@ -1,0 +1,6 @@
+# Ignore everything in temp/
+*
+# Except keep files and README
+!**/.gitkeep
+!**/README.md
+!.gitignore

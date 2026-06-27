@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Frequency Spectrum — uploop-vided</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                background: #0a0a0f;
+                color: #e0e0e0;
+                font-family: system-ui, sans-serif;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                min-height: 100vh;
+                padding: 24px;
+                gap: 16px;
+            }
+            .back {
+                position: fixed;
+                top: 16px;
+                left: 16px;
+                z-index: 10;
+                color: #888;
+                text-decoration: none;
+                font-size: 14px;
+            }
+            .back:hover {
+                color: #fff;
+            }
+            .title-bar {
+                background: #151520;
+                padding: 10px 24px;
+                border-radius: 12px;
+                font-size: 15px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                border: 1px solid #252535;
+            }
+            .main-grid {
+                display: flex;
+                gap: 16px;
+                width: 100%;
+                max-width: 1100px;
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            canvas {
+                background: #151520;
+                border-radius: 12px;
+                border: 1px solid #252535;
+                display: block;
+            }
+            .controls {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                justify-content: center;
+                align-items: center;
+                max-width: 1000px;
+            }
+            .controls button {
+                background: #1e1e30;
+                color: #e0e0e0;
+                border: 1px solid #333;
+                padding: 8px 16px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 13px;
+                transition: background 0.2s;
+            }
+            .controls button:hover {
+                background: #2a2a40;
+            }
+            .controls button.active {
+                background: #2a3a2a;
+                border-color: #4f8;
+                color: #4f8;
+            }
+            .peak-info {
+                background: #151520;
+                border: 1px solid #252535;
+                border-radius: 10px;
+                padding: 14px 20px;
+                font-size: 13px;
+                display: flex;
+                gap: 24px;
+                align-items: center;
+            }
+            .peak-info strong {
+                color: #4f8;
+            }
+            .peak-info .note {
+                font-size: 20px;
+                font-weight: 700;
+                color: #fff;
+            }
+            .info-box {
+                background: #0f0f1a;
+                border: 1px solid #252535;
+                border-radius: 8px;
+                padding: 12px 18px;
+                font-size: 12px;
+                color: #aaa;
+                max-width: 600px;
+                text-align: center;
+                line-height: 1.6;
+            }
+        </style>
+    </head>
+    <body>
+        <a href="../.." class="back">← Examples</a>
+        <div class="title-bar">📊 Frequency Spectrum · FFT Visualizer</div>
+
+        <div class="controls">
+            <button id="btn-play">▶ Play Mic</button>
+            <button id="btn-mode-bars" class="active">📊 Bars</button>
+            <button id="btn-mode-circle">⭕ Circle</button>
+            <button id="btn-mode-waterfall">🌊 Waterfall</button>
+        </div>
+
+        <div class="main-grid">
+            <canvas id="canvas" width="700" height="450"></canvas>
+        </div>
+
+        <div class="peak-info">
+            <div>Peak Frequency: <strong id="peak-freq">—</strong></div>
+            <div>Detected Note: <span class="note" id="peak-note">—</span></div>
+            <div>Cents off: <strong id="peak-cents">—</strong></div>
+        </div>
+
+        <div class="info-box">
+            <strong>Frequency Analysis</strong> — The spectrum shows sound
+            intensity from 20Hz to 20kHz on a logarithmic scale. Peak detection
+            identifies the loudest frequency and maps it to the nearest musical
+            note (A4=440Hz). Uses
+            <code>AnalyserNode.getByteFrequencyData()</code> for real-time
+            FFT.<br />
+            <code>import { easing } from '@uploop/timeline'</code> — used for
+            smoothing peak transitions
+        </div>
+
+        <script type="module">
+            import { easing } from "@uploop/timeline";
+            import { blendModes } from "@uploop/compositor";
+
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+
+            // ── Audio ──────────────────────────────────────────────────────────
+            let audioCtx = null;
+            let analyser = null;
+            let source = null;
+            let micStream = null;
+            let isPlaying = false;
+            let displayMode = "bars"; // bars | circle | waterfall
+            let waterfallHistory = [];
+
+            async function startMic() {
+                if (isPlaying) return;
+                try {
+                    audioCtx =
+                        audioCtx ||
+                        new (
+                            window.AudioContext || window.webkitAudioContext
+                        )();
+                    if (audioCtx.state === "suspended") await audioCtx.resume();
+                    micStream = await navigator.mediaDevices.getUserMedia({
+                        audio: true,
+                    });
+                    source = audioCtx.createMediaStreamSource(micStream);
+                    analyser = audioCtx.createAnalyser();
+                    analyser.fftSize = 2048;
+                    analyser.smoothingTimeConstant = 0.8;
+                    source.connect(analyser);
+                    isPlaying = true;
+                    document.getElementById("btn-play").textContent =
+                        "⏸ Stop Mic";
+                    document.getElementById("btn-play").classList.add("active");
+                } catch (err) {
+                    console.warn("Microphone access denied:", err.message);
+                    // Fallback: generate test tone
+                    generateTestTone();
+                }
+            }
+
+            function generateTestTone() {
+                audioCtx =
+                    audioCtx ||
+                    new (window.AudioContext || window.webkitAudioContext)();
+                analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 2048;
+                analyser.smoothingTimeConstant = 0.8;
+                const osc1 = audioCtx.createOscillator();
+                const osc2 = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                gain.gain.value = 0.1;
+                osc1.type = "sawtooth";
+                osc1.frequency.value = 440;
+                osc2.type = "square";
+                osc2.frequency.value = 660;
+                osc1.connect(gain);
+                osc2.connect(gain);
+                gain.connect(analyser);
+                gain.connect(audioCtx.destination);
+                osc1.start();
+                osc2.start();
+                isPlaying = true;
+                document.getElementById("btn-play").textContent = "⏸ Stop";
+                document.getElementById("btn-play").classList.add("active");
+            }
+
+            function stopAudio() {
+                if (micStream) {
+                    micStream.getTracks().forEach((t) => t.stop());
+                    micStream = null;
+                }
+                if (source) {
+                    source.disconnect();
+                    source = null;
+                }
+                if (audioCtx && audioCtx.state !== "closed") {
+                    audioCtx.close().catch(() => {});
+                    audioCtx = null;
+                    analyser = null;
+                }
+                isPlaying = false;
+                document.getElementById("btn-play").textContent = "▶ Play Mic";
+                document.getElementById("btn-play").classList.remove("active");
+            }
+
+            // ── Note detection ────────────────────────────────────────────────
+            const noteNames = [
+                "C",
+                "C#",
+                "D",
+                "D#",
+                "E",
+                "F",
+                "F#",
+                "G",
+                "G#",
+                "A",
+                "A#",
+                "B",
+            ];
+            function freqToNote(freq) {
+                if (freq <= 0) return { note: "—", cents: 0 };
+                const midi = 69 + 12 * Math.log2(freq / 440);
+                const noteIdx = Math.round(midi) % 12;
+                const cents = Math.round((midi - Math.round(midi)) * 100);
+                const octave = Math.floor(Math.round(midi) / 12) - 1;
+                return { note: noteNames[noteIdx] + octave, cents };
+            }
+
+            let smoothedPeak = 0;
+            function getPeakFrequency(dataArray) {
+                const bufferLength = dataArray.length;
+                let maxVal = 0;
+                let maxIdx = 0;
+                // Skip DC/low noise (first 2 bins)
+                for (let i = 2; i < bufferLength; i++) {
+                    if (dataArray[i] > maxVal) {
+                        maxVal = dataArray[i];
+                        maxIdx = i;
+                    }
+                }
+                const sampleRate = audioCtx ? audioCtx.sampleRate : 44100;
+                const freq =
+                    (maxIdx * sampleRate) / (analyser?.fftSize || 2048);
+
+                // Smooth using easing
+                if (smoothedPeak === 0) smoothedPeak = freq;
+                smoothedPeak =
+                    smoothedPeak + (freq - smoothedPeak) * easing.easeOut(0.15);
+
+                return smoothedPeak;
+            }
+
+            // ── Draw bars mode ────────────────────────────────────────────────
+            function drawBars(dataArray) {
+                const w = canvas.width;
+                const h = canvas.height;
+                const bufferLength = dataArray.length;
+                const sampleRate = audioCtx ? audioCtx.sampleRate : 44100;
+                const nyquist = sampleRate / 2;
+
+                ctx.clearRect(0, 0, w, h);
+
+                // Grid
+                ctx.strokeStyle = "#1a1a2a";
+                ctx.lineWidth = 1;
+                for (let i = 1; i < 8; i++) {
+                    const y = (h / 8) * i;
+                    ctx.beginPath();
+                    ctx.moveTo(40, y);
+                    ctx.lineTo(w - 10, y);
+                    ctx.stroke();
+                }
+
+                // Log scale frequency axis
+                const minFreq = 20;
+                const maxFreq = nyquist;
+                const logMin = Math.log10(minFreq);
+                const logMax = Math.log10(maxFreq);
+
+                // Draw bars using log-scale binning
+                const numBars = 200;
+                const barW = (w - 60) / numBars;
+
+                for (let i = 0; i < numBars; i++) {
+                    // Map bar index to frequency (log scale)
+                    const freq = Math.pow(
+                        10,
+                        logMin + ((logMax - logMin) * i) / numBars,
+                    );
+                    const idx = Math.round((freq / nyquist) * bufferLength);
+                    if (idx >= bufferLength) continue;
+
+                    const val = dataArray[idx] / 255;
+                    const barH = val * (h - 80);
+                    const x = 40 + i * barW;
+                    const hue = (i / numBars) * 240;
+                    ctx.fillStyle = `hsla(${hue}, 80%, 50%, 0.9)`;
+                    ctx.fillRect(x, h - 40 - barH, Math.max(1, barW - 1), barH);
+                }
+
+                // Frequency labels
+                ctx.fillStyle = "#888";
+                ctx.font = "10px system-ui";
+                ctx.textAlign = "center";
+                const labelFreqs = [
+                    20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000,
+                ];
+                for (const f of labelFreqs) {
+                    const x =
+                        40 +
+                        ((Math.log10(f) - logMin) / (logMax - logMin)) *
+                            (w - 60);
+                    let label =
+                        f >= 1000 ? (f / 1000).toFixed(0) + "k" : f + "";
+                    if (f === 20000) label = "20k";
+                    ctx.fillText(label + "Hz", x, h - 8);
+                }
+
+                // Title
+                ctx.fillStyle = "#fff";
+                ctx.font = "14px system-ui";
+                ctx.textAlign = "left";
+                ctx.fillText("Frequency Spectrum", 40, 26);
+            }
+
+            // ── Draw circle mode ──────────────────────────────────────────────
+            function drawCircle(dataArray) {
+                const w = canvas.width;
+                const h = canvas.height;
+                const cx = w / 2;
+                const cy = h / 2;
+                const bufferLength = dataArray.length;
+                const sampleRate = audioCtx ? audioCtx.sampleRate : 44100;
+                const nyquist = sampleRate / 2;
+                const logMin = Math.log10(20);
+                const logMax = Math.log10(nyquist);
+
+                ctx.clearRect(0, 0, w, h);
+
+                const numRays = 360;
+                const maxRadius = Math.min(w, h) / 2 - 20;
+
+                for (let i = 0; i < numRays; i++) {
+                    const freq = Math.pow(
+                        10,
+                        logMin + ((logMax - logMin) * i) / numRays,
+                    );
+                    const idx = Math.round((freq / nyquist) * bufferLength);
+                    if (idx >= bufferLength) continue;
+                    const val = dataArray[idx] / 255;
+                    const r = val * maxRadius;
+                    const angle = (i / numRays) * Math.PI * 2 - Math.PI / 2;
+                    const hue = (i / numRays) * 240;
+
+                    ctx.strokeStyle = `hsla(${hue}, 80%, 50%, 0.8)`;
+                    ctx.lineWidth = 1.2;
+                    ctx.beginPath();
+                    ctx.moveTo(
+                        cx + Math.cos(angle) * 10,
+                        cy + Math.sin(angle) * 10,
+                    );
+                    ctx.lineTo(
+                        cx + Math.cos(angle) * (10 + r),
+                        cy + Math.sin(angle) * (10 + r),
+                    );
+                    ctx.stroke();
+                }
+
+                // Center frequency labels
+                ctx.fillStyle = "#888";
+                ctx.font = "10px system-ui";
+                ctx.textAlign = "center";
+                const labelFreqs = [50, 200, 1000, 5000, 10000];
+                for (const f of labelFreqs) {
+                    const angle =
+                        ((Math.log10(f) - logMin) / (logMax - logMin)) *
+                            Math.PI *
+                            2 -
+                        Math.PI / 2;
+                    const lx = cx + Math.cos(angle) * (maxRadius + 16);
+                    const ly = cy + Math.sin(angle) * (maxRadius + 16);
+                    let label = f >= 1000 ? (f / 1000).toFixed(0) + "k" : f;
+                    ctx.fillText(label, lx, ly + 4);
+                }
+
+                // Title
+                ctx.fillStyle = "#fff";
+                ctx.font = "14px system-ui";
+                ctx.textAlign = "center";
+                ctx.fillText("Circular Spectrum", cx, 22);
+            }
+
+            // ── Draw waterfall mode ───────────────────────────────────────────
+            function drawWaterfall(dataArray) {
+                const w = canvas.width;
+                const h = canvas.height;
+                const bufferLength = dataArray.length;
+                const sampleRate = audioCtx ? audioCtx.sampleRate : 44100;
+                const nyquist = sampleRate / 2;
+                const logMin = Math.log10(20);
+                const logMax = Math.log10(nyquist);
+
+                // Add current frame to history (compressed to width)
+                const numBars = w - 60;
+                const row = new Array(numBars).fill(0);
+                for (let i = 0; i < numBars; i++) {
+                    const freq = Math.pow(
+                        10,
+                        logMin + ((logMax - logMin) * i) / numBars,
+                    );
+                    const idx = Math.round((freq / nyquist) * bufferLength);
+                    if (idx < bufferLength) row[i] = dataArray[idx] / 255;
+                }
+                waterfallHistory.push(row);
+                if (waterfallHistory.length > h - 60) waterfallHistory.shift();
+
+                ctx.clearRect(0, 0, w, h);
+
+                // Draw waterfall (top = most recent)
+                const imgData = ctx.createImageData(
+                    numBars,
+                    waterfallHistory.length,
+                );
+                for (let y = 0; y < waterfallHistory.length; y++) {
+                    const rowData =
+                        waterfallHistory[waterfallHistory.length - 1 - y];
+                    for (let x = 0; x < numBars; x++) {
+                        const i = (y * numBars + x) * 4;
+                        const val = rowData[x] || 0;
+                        const hue = (x / numBars) * 240;
+                        const rgb = hslToRgb(hue / 360, 0.8, val);
+                        imgData.data[i] = rgb[0];
+                        imgData.data[i + 1] = rgb[1];
+                        imgData.data[i + 2] = rgb[2];
+                        imgData.data[i + 3] = 255;
+                    }
+                }
+                // Draw to canvas
+                const tempCanvas = document.createElement("canvas");
+                tempCanvas.width = numBars;
+                tempCanvas.height = waterfallHistory.length;
+                const tempCtx = tempCanvas.getContext("2d");
+                tempCtx.putImageData(imgData, 0, 0);
+                ctx.drawImage(
+                    tempCanvas,
+                    40,
+                    h - 40 - waterfallHistory.length,
+                    numBars,
+                    waterfallHistory.length,
+                );
+
+                // Frequency labels
+                ctx.fillStyle = "#888";
+                ctx.font = "10px system-ui";
+                ctx.textAlign = "center";
+                const labelFreqs = [50, 200, 1000, 5000, 10000];
+                for (const f of labelFreqs) {
+                    const x =
+                        40 +
+                        ((Math.log10(f) - logMin) / (logMax - logMin)) *
+                            (w - 60);
+                    let label = f >= 1000 ? (f / 1000).toFixed(0) + "k" : f;
+                    ctx.fillText(label, x, h - 6);
+                }
+
+                ctx.fillStyle = "#fff";
+                ctx.font = "14px system-ui";
+                ctx.textAlign = "left";
+                ctx.fillText("Waterfall Spectrogram", 40, 22);
+            }
+
+            function hslToRgb(h, s, l) {
+                let r, g, b;
+                if (s === 0) {
+                    r = g = b = l;
+                } else {
+                    const hue2rgb = (p, q, t) => {
+                        if (t < 0) t += 1;
+                        if (t > 1) t -= 1;
+                        if (t < 1 / 6) return p + (q - p) * 6 * t;
+                        if (t < 1 / 2) return q;
+                        if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+                        return p;
+                    };
+                    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+                    const p = 2 * l - q;
+                    r = hue2rgb(p, q, h + 1 / 3);
+                    g = hue2rgb(p, q, h);
+                    b = hue2rgb(p, q, h - 1 / 3);
+                }
+                return [
+                    Math.round(r * 255),
+                    Math.round(g * 255),
+                    Math.round(b * 255),
+                ];
+            }
+
+            // ── Controls ──────────────────────────────────────────────────────
+            document
+                .getElementById("btn-play")
+                .addEventListener("click", () => {
+                    if (isPlaying) stopAudio();
+                    else startMic();
+                });
+
+            document
+                .getElementById("btn-mode-bars")
+                .addEventListener("click", () => {
+                    displayMode = "bars";
+                    setActiveModeBtn("btn-mode-bars");
+                });
+            document
+                .getElementById("btn-mode-circle")
+                .addEventListener("click", () => {
+                    displayMode = "circle";
+                    setActiveModeBtn("btn-mode-circle");
+                });
+            document
+                .getElementById("btn-mode-waterfall")
+                .addEventListener("click", () => {
+                    displayMode = "waterfall";
+                    setActiveModeBtn("btn-mode-waterfall");
+                });
+
+            function setActiveModeBtn(id) {
+                [
+                    "btn-mode-bars",
+                    "btn-mode-circle",
+                    "btn-mode-waterfall",
+                ].forEach((bid) => {
+                    document
+                        .getElementById(bid)
+                        .classList.toggle("active", bid === id);
+                });
+            }
+
+            // ── Loop ──────────────────────────────────────────────────────────
+            function loop() {
+                const bufferLength = analyser?.frequencyBinCount || 1024;
+                const dataArray = new Uint8Array(bufferLength);
+
+                if (analyser && isPlaying) {
+                    analyser.getByteFrequencyData(dataArray);
+                    const peakFreq = getPeakFrequency(dataArray);
+                    document.getElementById("peak-freq").textContent =
+                        Math.round(peakFreq) + " Hz";
+                    const { note, cents } = freqToNote(peakFreq);
+                    document.getElementById("peak-note").textContent = note;
+                    document.getElementById("peak-cents").textContent =
+                        (cents >= 0 ? "+" : "") + cents + "¢";
+                } else {
+                    // Fill with random data for visual demo
+                    for (let i = 0; i < bufferLength; i++) {
+                        dataArray[i] = Math.random() * 30;
+                    }
+                    document.getElementById("peak-freq").textContent = "—";
+                    document.getElementById("peak-note").textContent = "—";
+                    document.getElementById("peak-cents").textContent = "—";
+                }
+
+                switch (displayMode) {
+                    case "circle":
+                        drawCircle(dataArray);
+                        break;
+                    case "waterfall":
+                        drawWaterfall(dataArray);
+                        break;
+                    default:
+                        drawBars(dataArray);
+                        break;
+                }
+
+                requestAnimationFrame(loop);
+            }
+            loop();
+
+            console.log(
+                "%c📊 Frequency Spectrum%c | Real-time FFT visualizer",
+                "color:#4f8",
+                "",
+            );
+            console.log(
+                '  Click "Play Mic" to start, toggle display modes: Bars, Circle, Waterfall',
+            );
+        </script>
+    </body>
+</html>

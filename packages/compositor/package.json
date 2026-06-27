@@ -1,0 +1,22 @@
+{
+  "name": "@uploop/compositor",
+  "version": "0.1.0",
+  "description": "Uploop compositor — GPU-accelerated layer compositing, effects, transitions, blending",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@uploop/media": "workspace:*",
+    "@uploop/timeline": "workspace:*"
+  }
+}

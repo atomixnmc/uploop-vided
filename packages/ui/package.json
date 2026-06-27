@@ -1,0 +1,23 @@
+{
+  "name": "@uploop/vided-ui",
+  "version": "0.1.0",
+  "description": "Uploop video UI — web components for player, timeline editor, inspector",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@uploop/timeline": "workspace:*",
+    "@uploop/compositor": "workspace:*",
+    "@uploop/output": "workspace:*"
+  }
+}

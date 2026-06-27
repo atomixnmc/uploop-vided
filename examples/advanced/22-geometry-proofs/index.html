@@ -1,0 +1,724 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geometry Proofs — uploop-vided</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0a0a0f;
+      color: #e0e0e0;
+      font-family: system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 60px 24px 40px;
+      gap: 16px;
+    }
+    .back {
+      position: fixed;
+      top: 16px; left: 16px;
+      color: #888;
+      text-decoration: none;
+      font-size: 14px;
+      z-index: 100;
+    }
+    .back:hover { color: #fff; }
+    .title-bar {
+      width: min(800px, 90vw);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .title-bar h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: #4f8;
+    }
+    .title-bar span {
+      font-size: 12px;
+      color: #666;
+    }
+    .tabs {
+      display: flex;
+      gap: 4px;
+    }
+    .tabs button {
+      background: #151520;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 8px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .tabs button:hover { background: #1e1e30; }
+    .tabs button.active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
+    .stage {
+      width: min(800px, 90vw);
+      height: min(460px, 55vh);
+      background: #151520;
+      border-radius: 12px;
+      overflow: hidden;
+      position: relative;
+    }
+    .stage canvas { width: 100%; height: 100%; display: block; }
+    .info-panel {
+      width: min(800px, 90vw);
+      background: #151520;
+      border-radius: 10px;
+      padding: 14px 18px;
+      font-size: 13px;
+      color: #aaa;
+      line-height: 1.5;
+      min-height: 42px;
+    }
+    .info-panel .formula {
+      color: #4f8;
+      font-family: 'Courier New', monospace;
+      font-weight: 600;
+    }
+    .info-panel .value {
+      color: #f8c040;
+      font-weight: 600;
+    }
+    .controls {
+      width: min(800px, 90vw);
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .controls button {
+      background: #151520;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      padding: 8px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    .controls button:hover { background: #1e1e30; }
+    .controls button.active { background: #2a3a2a; border-color: #4f8; }
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      flex: 1;
+      min-width: 160px;
+    }
+    .slider-row label { font-size: 12px; color: #888; white-space: nowrap; }
+    .slider-row input[type="range"] { flex: 1; accent-color: #4f8; }
+    .slider-row span { font-size: 12px; color: #4f8; min-width: 36px; text-align: right; }
+    .legend {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .legend span {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: #888;
+    }
+    .legend .swatch {
+      width: 10px; height: 10px;
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body>
+  <a href="../.." class="back">← Examples</a>
+
+  <div class="title-bar">
+    <h1>📏 Geometry Proofs</h1>
+    <span>Interactive geometry demonstrations</span>
+  </div>
+
+  <div class="tabs">
+    <button data-tab="pythagorean" class="active">Pythagorean Theorem</button>
+    <button data-tab="circle">Circle Theorems</button>
+    <button data-tab="transform">Transformations</button>
+  </div>
+
+  <div class="stage">
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <div class="info-panel" id="info"></div>
+
+  <div class="controls" id="controls"></div>
+
+  <div class="legend" id="legend"></div>
+
+  <script type="module">
+    import { easing } from '@uploop/timeline'
+    import { blendModes } from '@uploop/compositor'
+
+    const canvas = document.getElementById('canvas')
+    const ctx = canvas.getContext('2d')
+    const infoPanel = document.getElementById('info')
+    const controlsDiv = document.getElementById('controls')
+    const legendDiv = document.getElementById('legend')
+    const tabButtons = document.querySelectorAll('.tabs button')
+
+    let W, H, currentTab = 'pythagorean'
+
+    // ── Pythagorean state ─────────────────────────────────────────────
+    // Right triangle: point A (left-bottom), B (right-bottom), C (apex, right angle at B)
+    let pythA = { x: 0, y: 0 }
+    let pythB = { x: 260, y: 0 }
+    let pythC = { x: 260, y: 180 }
+    let dragPyth = null
+    let pythCenterX = 0, pythCenterY = 0
+
+    function updatePythSides() {
+      pythA = { x: pythC.x, y: pythB.y } // A is directly below C, same y as B --- no wait, redo
+      // Let's keep A and B moveable, C computed as right angle
+      // A and B define baseline, C is A + perpendicular
+    }
+
+    // ── Circle state ──────────────────────────────────────────────────
+    let circleCenter = { x: 0, y: 0 }
+    let circleR = 0
+    let arcPointA = 0  // angle for point A on circle
+    let arcPointB = Math.PI / 3 // angle for point B
+    let arcPointC = Math.PI / 2 // angle for point C (vertex of inscribed angle)
+    let dragArc = null
+
+    // ── Transform state ───────────────────────────────────────────────
+    let transformAngle = 30
+    let transformScaleX = 1
+    let transformScaleY = 1
+    let transformTx = 0
+    let transformTy = 0
+    let transformMode = 'rotate' // rotate | reflect | translate
+    let shapePts = [] // original shape vertices
+    let transformedPts = []
+
+    function defineShape() {
+      const cx = W / 2, cy = H / 2
+      const s = 60
+      shapePts = [
+        { x: cx - s, y: cy - s * 0.7 },
+        { x: cx + s, y: cy - s * 0.5 },
+        { x: cx + s * 0.5, y: cy + s * 0.7 },
+        { x: cx - s * 0.6, y: cy + s * 0.4 },
+      ]
+    }
+
+    function applyTransform() {
+      const cx = W / 2, cy = H / 2
+      transformedPts = shapePts.map(p => {
+        let x = p.x - cx
+        let y = p.y - cy
+        if (transformMode === 'rotate') {
+          const rad = transformAngle * Math.PI / 180
+          const cos = Math.cos(rad), sin = Math.sin(rad)
+          return { x: cx + x * cos - y * sin, y: cy + x * sin + y * cos }
+        }
+        if (transformMode === 'reflect') {
+          // Reflect across line at given angle
+          const rad = transformAngle * Math.PI / 180
+          return { x: cx + x * Math.cos(2 * rad) + y * Math.sin(2 * rad), y: cy + x * Math.sin(2 * rad) - y * Math.cos(2 * rad) }
+        }
+        if (transformMode === 'translate') {
+          return { x: p.x + transformTx, y: p.y + transformTy }
+        }
+        return { x: p.x, y: p.y }
+      })
+    }
+
+    // ── Drawing helpers ───────────────────────────────────────────────
+    function drawGrid(major, minor, color) {
+      ctx.strokeStyle = color || '#1a1a28'
+      ctx.lineWidth = 0.5
+      const s = minor || 30
+      for (let x = s; x < W; x += s) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
+      }
+      for (let y = s; y < H; y += s) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+      }
+      if (major) {
+        ctx.strokeStyle = '#222233'
+        ctx.lineWidth = 1
+        for (let x = major; x < W; x += major) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
+        }
+        for (let y = major; y < H; y += major) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+        }
+      }
+    }
+
+    function drawArrow(x1, y1, x2, y2, color, width) {
+      ctx.strokeStyle = color || '#888'
+      ctx.lineWidth = width || 2
+      ctx.beginPath()
+      ctx.moveTo(x1, y1)
+      ctx.lineTo(x2, y2)
+      ctx.stroke()
+      const angle = Math.atan2(y2 - y1, x2 - x1)
+      const len = 10
+      ctx.fillStyle = color || '#888'
+      ctx.beginPath()
+      ctx.moveTo(x2, y2)
+      ctx.lineTo(x2 - len * Math.cos(angle - Math.PI / 6), y2 - len * Math.sin(angle - Math.PI / 6))
+      ctx.lineTo(x2 - len * Math.cos(angle + Math.PI / 6), y2 - len * Math.sin(angle + Math.PI / 6))
+      ctx.closePath()
+      ctx.fill()
+    }
+
+    // ── Pythagorean Tab ───────────────────────────────────────────────
+    function drawPythagorean() {
+      ctx.clearRect(0, 0, W, H)
+      drawGrid(60, 30)
+
+      const cx = W / 2, cy = H / 2 + 20
+
+      // Triangle vertices (right angle at B)
+      const a = 220, b = 160
+      const A = { x: cx - a / 2, y: cy + b / 2 }
+      const B = { x: cx + a / 2, y: cy + b / 2 }
+      const C = { x: cx + a / 2, y: cy - b / 2 }
+      const legs = [
+        { from: A, to: B, len: a },  // leg AB
+        { from: B, to: C, len: b },  // leg BC
+        { from: C, to: A, len: Math.sqrt(a * a + b * b) }, // hypotenuse
+      ]
+
+      // Draw squares on each side
+      const squares = [
+        { base: [A, B], side: 'down', color: 'rgba(79,200,255,0.15)', stroke: '#4fc8ff', label: 'a²' },
+        { base: [B, C], side: 'right', color: 'rgba(255,140,80,0.15)', stroke: '#ff8c50', label: 'b²' },
+        { base: [C, A], side: 'inward', color: 'rgba(79,255,136,0.15)', stroke: '#4f8', label: 'c²' },
+      ]
+
+      squares.forEach(({ base, color, stroke, label }) => {
+        const [p1, p2] = base
+        const dx = p2.x - p1.x
+        const dy = p2.y - p1.y
+        let nx, ny
+        if (base === squares[0].base) { nx = -dy; ny = dx } // perpendicular outward (down)
+        else if (base === squares[1].base) { nx = -dy; ny = dx } // perpendicular outward (right)
+        else { nx = dy; ny = -dx } // inward (toward triangle)
+
+        const len = Math.sqrt(dx * dx + dy * dy)
+        nx /= len; ny /= len
+        const sLen = len
+        const p3 = { x: p2.x + nx * sLen, y: p2.y + ny * sLen }
+        const p4 = { x: p1.x + nx * sLen, y: p1.y + ny * sLen }
+
+        ctx.fillStyle = color
+        ctx.beginPath()
+        ctx.moveTo(p1.x, p1.y)
+        ctx.lineTo(p2.x, p2.y)
+        ctx.lineTo(p3.x, p3.y)
+        ctx.lineTo(p4.x, p4.y)
+        ctx.closePath()
+        ctx.fill()
+        ctx.strokeStyle = stroke
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+
+        // Label
+        const midX = (p1.x + p3.x) / 2
+        const midY = (p1.y + p3.y) / 2
+        ctx.fillStyle = stroke
+        ctx.font = 'bold 14px system-ui'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(label, midX, midY)
+      })
+
+      // Triangle
+      ctx.fillStyle = 'rgba(248,192,64,0.2)'
+      ctx.beginPath()
+      ctx.moveTo(A.x, A.y); ctx.lineTo(B.x, B.y); ctx.lineTo(C.x, C.y); ctx.closePath()
+      ctx.fill()
+      ctx.strokeStyle = '#f8c040'
+      ctx.lineWidth = 2.5
+      ctx.stroke()
+
+      // Right angle marker at B
+      const markSize = 16
+      ctx.strokeStyle = '#f8c040'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.moveTo(B.x - markSize, B.y)
+      ctx.lineTo(B.x - markSize, B.y - markSize)
+      ctx.lineTo(B.x, B.y - markSize)
+      ctx.stroke()
+
+      // Vertex labels
+      ctx.fillStyle = '#fff'
+      ctx.font = 'bold 14px system-ui'
+      ctx.textAlign = 'center'
+      ctx.fillText('A', A.x - 16, A.y + 6)
+      ctx.fillText('B', B.x + 16, B.y + 6)
+      ctx.fillText('C', C.x + 16, C.y - 6)
+
+      // Side labels inside triangle
+      ctx.fillStyle = '#f8c040'
+      ctx.font = '12px system-ui'
+      ctx.fillText('a', (A.x + B.x) / 2, (A.y + B.y) / 2 + 16)
+      ctx.fillText('b', (B.x + C.x) / 2 + 16, (B.y + C.y) / 2)
+      ctx.fillText('c', (C.x + A.x) / 2 - 14, (C.y + A.y) / 2)
+      ctx.textBaseline = 'alphabetic'
+
+      const aLen = Math.sqrt((B.x - A.x) ** 2 + (B.y - A.y) ** 2)
+      const bLen = Math.sqrt((C.x - B.x) ** 2 + (C.y - B.y) ** 2)
+      const cLen = Math.sqrt((C.x - A.x) ** 2 + (C.y - A.y) ** 2)
+
+      infoPanel.innerHTML = `
+        <span class="formula">a² + b² = c²</span><br>
+        <span class="value">${(aLen / 30).toFixed(1)}²</span> +
+        <span class="value">${(bLen / 30).toFixed(1)}²</span> =
+        <span class="value">${(cLen / 30).toFixed(1)}²</span><br>
+        <span style="color:#666">Area of green square = sum of areas of blue + orange squares</span>
+      `
+      legendDiv.innerHTML = `
+        <span><span class="swatch" style="background:#4fc8ff"></span> Square on leg a</span>
+        <span><span class="swatch" style="background:#ff8c50"></span> Square on leg b</span>
+        <span><span class="swatch" style="background:#4f8"></span> Square on hypotenuse c</span>
+      `
+    }
+
+    // ── Circle Tab ────────────────────────────────────────────────────
+    function drawCircleTheorems() {
+      ctx.clearRect(0, 0, W, H)
+      drawGrid(50, 25)
+
+      const cx = W / 2, cy = H / 2
+      circleCenter = { x: cx, y: cy }
+      circleR = Math.min(W, H) * 0.35
+
+      // Circle
+      ctx.strokeStyle = '#4f8'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.arc(cx, cy, circleR, 0, Math.PI * 2)
+      ctx.stroke()
+
+      // Points on circle
+      const A = { x: cx + circleR * Math.cos(arcPointA), y: cy + circleR * Math.sin(arcPointA) }
+      const B = { x: cx + circleR * Math.cos(arcPointB), y: cy + circleR * Math.sin(arcPointB) }
+      const C = { x: cx + circleR * Math.cos(arcPointC), y: cy + circleR * Math.sin(arcPointC) }
+
+      // Inscribed angle: ∠ACB intercepts arc AB
+      // Central angle: ∠AOB
+      const centralAngle = ((arcPointB - arcPointA) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI)
+      const inscribedAngle = centralAngle / 2
+
+      // Draw central angle
+      ctx.fillStyle = 'rgba(255,140,80,0.2)'
+      ctx.beginPath()
+      ctx.moveTo(cx, cy)
+      ctx.arc(cx, cy, circleR * 0.4, arcPointA, arcPointB, arcPointA > arcPointB)
+      ctx.lineTo(cx, cy)
+      ctx.fill()
+      ctx.strokeStyle = '#ff8c50'
+      ctx.lineWidth = 1.5
+      ctx.beginPath()
+      ctx.moveTo(A.x, A.y); ctx.lineTo(cx, cy); ctx.lineTo(B.x, B.y)
+      ctx.stroke()
+
+      // Draw inscribed angle
+      ctx.fillStyle = 'rgba(79,255,136,0.15)'
+      ctx.beginPath()
+      ctx.moveTo(C.x, C.y)
+      ctx.arc(C.x, C.y, 30, Math.atan2(A.y - C.y, A.x - C.x), Math.atan2(B.y - C.y, B.x - C.x), false)
+      ctx.lineTo(C.x, C.y)
+      ctx.fill()
+      ctx.strokeStyle = '#4f8'
+      ctx.lineWidth = 2
+      ctx.beginPath()
+      ctx.moveTo(C.x, C.y); ctx.lineTo(A.x, A.y)
+      ctx.moveTo(C.x, C.y); ctx.lineTo(B.x, B.y)
+      ctx.stroke()
+
+      // Draw arc AB highlight
+      ctx.strokeStyle = '#f8c040'
+      ctx.lineWidth = 3
+      ctx.beginPath()
+      ctx.arc(cx, cy, circleR, arcPointA, arcPointB, arcPointA > arcPointB)
+      ctx.stroke()
+
+      // Points
+      ;[A, B, C].forEach((p, i) => {
+        ctx.fillStyle = '#f8c040'
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, 6, 0, Math.PI * 2)
+        ctx.fill()
+        ctx.strokeStyle = '#fff'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+
+        const labels = ['A', 'B', 'C']
+        const offsets = [{ x: -18, y: -6 }, { x: 10, y: -6 }, { x: -6, y: 14 }]
+        ctx.fillStyle = '#fff'
+        ctx.font = '13px system-ui'
+        ctx.fillText(labels[i], p.x + offsets[i].x, p.y + offsets[i].y)
+      })
+
+      // Center
+      ctx.fillStyle = '#888'
+      ctx.beginPath()
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2)
+      ctx.fill()
+      ctx.fillStyle = '#888'
+      ctx.font = '12px system-ui'
+      ctx.fillText('O', cx + 10, cy - 8)
+
+      const caDeg = ((centralAngle * 180 / Math.PI) % 360).toFixed(1)
+      const iaDeg = ((inscribedAngle * 180 / Math.PI) % 360).toFixed(1)
+
+      infoPanel.innerHTML = `
+        <span class="formula">Inscribed Angle Theorem</span>: inscribed angle = ½ × central angle<br>
+        Central ∠AOB = <span class="value">${caDeg}°</span>  
+        Inscribed ∠ACB = <span class="value">${iaDeg}°</span> =
+        <span class="value">½ × ${caDeg}°</span><br>
+        <span style="color:#666">Drag points around the circle | Both angles intercept arc AB</span>
+      `
+      legendDiv.innerHTML = `
+        <span><span class="swatch" style="background:#ff8c50"></span> Central angle ∠AOB</span>
+        <span><span class="swatch" style="background:#4f8"></span> Inscribed angle ∠ACB</span>
+        <span><span class="swatch" style="background:#f8c040"></span> Intercepted arc AB</span>
+      `
+    }
+
+    // ── Transformations Tab ───────────────────────────────────────────
+    function drawTransformations() {
+      ctx.clearRect(0, 0, W, H)
+      drawGrid(40, 20)
+
+      if (shapePts.length === 0) defineShape()
+      applyTransform()
+
+      // Original shape
+      ctx.fillStyle = 'rgba(79,200,255,0.3)'
+      ctx.strokeStyle = '#4fc8ff'
+      ctx.lineWidth = 2
+      ctx.setLineDash([5, 3])
+      ctx.beginPath()
+      shapePts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y))
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+      ctx.setLineDash([])
+
+      // Transformed shape
+      ctx.fillStyle = 'rgba(79,255,136,0.3)'
+      ctx.strokeStyle = '#4f8'
+      ctx.lineWidth = 2.5
+      ctx.beginPath()
+      transformedPts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y))
+      ctx.closePath()
+      ctx.fill()
+      ctx.stroke()
+
+      // Center marker
+      const cx = W / 2, cy = H / 2
+      ctx.fillStyle = '#888'
+      ctx.beginPath()
+      ctx.arc(cx, cy, 4, 0, Math.PI * 2)
+      ctx.fill()
+
+      // For rotate: draw arc
+      if (transformMode === 'rotate') {
+        const rad = transformAngle * Math.PI / 180
+        ctx.strokeStyle = '#f8c040'
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([4, 4])
+        ctx.beginPath()
+        ctx.arc(cx, cy, 25, 0, rad, rad < 0)
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.fillStyle = '#f8c040'
+        ctx.font = '12px system-ui'
+        ctx.fillText(`${transformAngle}°`, cx + 30, cy - 10)
+      }
+
+      // For reflect: draw mirror line
+      if (transformMode === 'reflect') {
+        const rad = transformAngle * Math.PI / 180
+        ctx.strokeStyle = '#f8c040'
+        ctx.lineWidth = 1.5
+        ctx.setLineDash([6, 4])
+        ctx.beginPath()
+        ctx.moveTo(cx - 150 * Math.cos(rad), cy - 150 * Math.sin(rad))
+        ctx.lineTo(cx + 150 * Math.cos(rad), cy + 150 * Math.sin(rad))
+        ctx.stroke()
+        ctx.setLineDash([])
+        ctx.fillStyle = '#f8c040'
+        ctx.font = '11px system-ui'
+        ctx.fillText('mirror', cx - 160 * Math.cos(rad) + 4, cy - 160 * Math.sin(rad) - 4)
+      }
+
+      // Matrix display
+      let matrixStr
+      if (transformMode === 'rotate') {
+        const rad = transformAngle * Math.PI / 180
+        matrixStr = `[[${Math.cos(rad).toFixed(2)}, ${(-Math.sin(rad)).toFixed(2)}],\n [${Math.sin(rad).toFixed(2)}, ${Math.cos(rad).toFixed(2)}]]`
+      } else if (transformMode === 'reflect') {
+        const rad = transformAngle * Math.PI / 180
+        matrixStr = `[[${Math.cos(2*rad).toFixed(2)}, ${Math.sin(2*rad).toFixed(2)}],\n [${Math.sin(2*rad).toFixed(2)}, ${-Math.cos(2*rad).toFixed(2)}]]`
+      } else {
+        matrixStr = `Translation: (${transformTx}, ${transformTy})`
+      }
+
+      infoPanel.innerHTML = `
+        Transform matrix:<br>
+        <span class="formula">${matrixStr.replace(/\n/g, '<br>')}</span>
+      `
+      legendDiv.innerHTML = `
+        <span><span class="swatch" style="background:#4fc8ff"></span> Original shape</span>
+        <span><span class="swatch" style="background:#4f8"></span> Transformed shape</span>
+      `
+    }
+
+    // ── Render dispatcher ─────────────────────────────────────────────
+    function render() {
+      if (currentTab === 'pythagorean') drawPythagorean()
+      else if (currentTab === 'circle') drawCircleTheorems()
+      else if (currentTab === 'transform') drawTransformations()
+    }
+
+    // ── Controls builder ──────────────────────────────────────────────
+    function buildControls() {
+      controlsDiv.innerHTML = ''
+
+      if (currentTab === 'pythagorean') {
+        // a slider
+        const row1 = document.createElement('div')
+        row1.className = 'slider-row'
+        row1.innerHTML = `<label>Leg a</label><input type="range" id="pyth-a" min="100" max="300" value="220"><span>220</span>`
+        row1.querySelector('input').addEventListener('input', (e) => {
+          const val = Number(e.target.value)
+          row1.querySelector('span').textContent = val
+          // We'll adjust in next render via global
+        })
+
+        const row2 = document.createElement('div')
+        row2.className = 'slider-row'
+        row2.innerHTML = `<label>Leg b</label><input type="range" id="pyth-b" min="80" max="260" value="160"><span>160</span>`
+        row2.querySelector('input').addEventListener('input', (e) => {
+          const val = Number(e.target.value)
+          row2.querySelector('span').textContent = val
+        })
+        controlsDiv.appendChild(row1)
+        controlsDiv.appendChild(row2)
+      }
+
+      if (currentTab === 'circle') {
+        // Point sliders
+        ;[
+          { id: 'arcA', label: 'Point A', get: () => arcPointA, set: v => { arcPointA = v } },
+          { id: 'arcB', label: 'Point B', get: () => arcPointB, set: v => { arcPointB = v } },
+          { id: 'arcC', label: 'Point C', get: () => arcPointC, set: v => { arcPointC = v } },
+        ].forEach(({ id, label, get, set }) => {
+          const row = document.createElement('div')
+          row.className = 'slider-row'
+          const deg = (get() * 180 / Math.PI).toFixed(0)
+          row.innerHTML = `<label>${label}</label><input type="range" min="0" max="360" value="${deg}"><span>${deg}°</span>`
+          row.querySelector('input').addEventListener('input', (e) => {
+            const val = Number(e.target.value)
+            set(val * Math.PI / 180)
+            row.querySelector('span').textContent = `${val}°`
+          })
+          controlsDiv.appendChild(row)
+        })
+      }
+
+      if (currentTab === 'transform') {
+        // Mode buttons
+        ;['rotate', 'reflect', 'translate'].forEach(m => {
+          const btn = document.createElement('button')
+          btn.textContent = m.charAt(0).toUpperCase() + m.slice(1)
+          btn.className = transformMode === m ? 'active' : ''
+          btn.addEventListener('click', () => { transformMode = m; transformTx = 0; transformTy = 0; transformAngle = 30; buildControls() })
+          controlsDiv.appendChild(btn)
+        })
+
+        if (transformMode === 'rotate' || transformMode === 'reflect') {
+          const row = document.createElement('div')
+          row.className = 'slider-row'
+          row.innerHTML = `<label>Angle</label><input type="range" min="0" max="360" value="${transformAngle}"><span>${transformAngle}°</span>`
+          row.querySelector('input').addEventListener('input', (e) => {
+            transformAngle = Number(e.target.value)
+            row.querySelector('span').textContent = `${transformAngle}°`
+          })
+          controlsDiv.appendChild(row)
+        }
+
+        if (transformMode === 'translate') {
+          ;[
+            { id: 'tx', label: 'Tx', get: transformTx, set: v => { transformTx = v } },
+            { id: 'ty', label: 'Ty', get: transformTy, set: v => { transformTy = v } },
+          ].forEach(({ id, label, get, set }) => {
+            const row = document.createElement('div')
+            row.className = 'slider-row'
+            row.innerHTML = `<label>${label}</label><input type="range" min="-150" max="150" value="${get}"><span>${get}</span>`
+            row.querySelector('input').addEventListener('input', (e) => {
+              const val = Number(e.target.value)
+              set(val)
+              row.querySelector('span').textContent = val
+            })
+            controlsDiv.appendChild(row)
+          })
+        }
+
+        const resetBtn = document.createElement('button')
+        resetBtn.textContent = '↺ Reset'
+        resetBtn.addEventListener('click', () => {
+          transformAngle = 30; transformScaleX = 1; transformScaleY = 1
+          transformTx = 0; transformTy = 0
+          buildControls()
+        })
+        controlsDiv.appendChild(resetBtn)
+      }
+    }
+
+    // ── Tab switching ─────────────────────────────────────────────────
+    tabButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentTab = btn.dataset.tab
+        tabButtons.forEach(b => b.classList.remove('active'))
+        btn.classList.add('active')
+        if (currentTab === 'transform') defineShape()
+        buildControls()
+        render()
+      })
+    })
+
+    // ── Animation loop ────────────────────────────────────────────────
+    function tick() {
+      render()
+      requestAnimationFrame(tick)
+    }
+
+    // ── Init ──────────────────────────────────────────────────────────
+    function resize() {
+      const stage = canvas.parentElement
+      canvas.width = W = stage.clientWidth
+      canvas.height = H = stage.clientHeight
+      if (currentTab === 'transform') defineShape()
+      render()
+    }
+
+    window.addEventListener('resize', resize)
+    resize()
+    buildControls()
+    requestAnimationFrame(tick)
+
+    console.log('%c📏 Geometry Proofs%c | pythagorean, circle, transformations', 'color:#4f8', '')
+    console.log('  Controls: tabs | sliders | draggable points')
+  </script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Uploop Editor</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; overflow: hidden; }
+    body {
+      background: #1a1a2e;
+      color: #eee;
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    }
+    #editor-root {
+      width: 100%;
+      height: 100%;
+    }
+    button {
+      background: #16213e;
+      color: #e0e0e0;
+      border: 1px solid #333;
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    button:hover { background: #1f3460; }
+    button:active { background: #0f3460; }
+  </style>
+</head>
+<body>
+  <div id="editor-root"></div>
+
+  <script type="module">
+    import { EditorApp } from '@uploop/editor'
+
+    const container = document.getElementById('editor-root')
+    if (!container) throw new Error('editor-root not found')
+
+    // Initialize the editor — optionally load an existing project
+    const editor = new EditorApp({ container })
+
+    // Wire up toolbar buttons
+    const btnSave = container.querySelector('#editor-btn-save')
+    const btnExport = container.querySelector('#editor-btn-export')
+
+    if (btnSave) {
+      btnSave.addEventListener('click', () => {
+        try {
+          editor.saveProject()
+          console.log('[editor] Project saved.')
+        } catch (err) {
+          console.error('[editor] Save failed:', err)
+        }
+      })
+    }
+
+    if (btnExport) {
+      btnExport.addEventListener('click', async () => {
+        const outputPath = prompt('Output file path:', './output.mp4')
+        if (!outputPath) return
+        try {
+          await editor.render(outputPath)
+          console.log('[editor] Render complete:', outputPath)
+        } catch (err) {
+          console.error('[editor] Render failed:', err)
+        }
+      })
+    }
+
+    console.log('[editor] EditorApp mounted.')
+  </script>
+</body>
+</html>

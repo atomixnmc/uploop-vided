@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200" fill="none">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#16a34a"/>
+      <stop offset="50%" stop-color="#0891b2"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#db2777"/>
+      <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <!-- Film reel / play motif -->
+  <circle cx="80" cy="100" r="60" stroke="url(#g)" stroke-width="4" fill="none"/>
+  <circle cx="80" cy="100" r="42" stroke="url(#g2)" stroke-width="1.5" stroke-dasharray="3 5" fill="none"/>
+  <circle cx="80" cy="100" r="18" stroke="url(#g)" stroke-width="2" fill="rgba(22,163,74,0.08)"/>
+  <!-- Play triangle -->
+  <polygon points="74,85 74,115 94,100" fill="url(#g)" opacity="0.9"/>
+  <!-- Connected nodes -->
+  <circle cx="185" cy="55" r="22" stroke="url(#g2)" stroke-width="2.5" fill="none"/>
+  <circle cx="185" cy="145" r="22" stroke="url(#g2)" stroke-width="2.5" fill="none"/>
+  <line x1="110" y1="85" x2="167" y2="64" stroke="url(#g)" stroke-width="2"/>
+  <line x1="110" y1="115" x2="167" y2="136" stroke="url(#g)" stroke-width="2"/>
+  <!-- Small timeline markers -->
+  <rect x="210" y="52" width="14" height="6" rx="2" fill="url(#g2)" opacity="0.6"/>
+  <rect x="232" y="52" width="20" height="6" rx="2" fill="url(#g)" opacity="0.8"/>
+  <rect x="260" y="52" width="10" height="6" rx="2" fill="url(#g2)" opacity="0.4"/>
+  <rect x="210" y="142" width="30" height="6" rx="2" fill="url(#g)" opacity="0.8"/>
+  <rect x="248" y="142" width="16" height="6" rx="2" fill="url(#g2)" opacity="0.6"/>
+  <rect x="272" y="142" width="8" height="6" rx="2" fill="url(#g)" opacity="0.3"/>
+  <!-- Text -->
+  <text x="260" y="108" font-family="system-ui,-apple-system,sans-serif" font-size="52" font-weight="800" fill="#0f172a">Uploop</text>
+  <text x="482" y="108" font-family="system-ui,-apple-system,sans-serif" font-size="52" font-weight="200" fill="#475569">Vided</text>
+  <text x="260" y="142" font-family="system-ui,-apple-system,sans-serif" font-size="15" fill="#64748b">Generative AI-Driven Composition &amp; VFX Engine</text>
+</svg>

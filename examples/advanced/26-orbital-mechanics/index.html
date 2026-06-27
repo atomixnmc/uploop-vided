@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Orbital Mechanics — uploop-vided</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                background: #0a0a0f;
+                color: #e0e0e0;
+                font-family: system-ui, sans-serif;
+                display: flex;
+                height: 100vh;
+                overflow: hidden;
+            }
+            .back {
+                position: fixed;
+                top: 16px;
+                left: 16px;
+                z-index: 10;
+                color: #888;
+                text-decoration: none;
+                font-size: 14px;
+            }
+            .back:hover {
+                color: #fff;
+            }
+            .title-bar {
+                position: fixed;
+                top: 0;
+                left: 50%;
+                transform: translateX(-50%);
+                background: #151520;
+                padding: 10px 24px;
+                border-radius: 0 0 12px 12px;
+                font-size: 15px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                z-index: 5;
+                border: 1px solid #252535;
+                border-top: none;
+            }
+            .canvas-wrap {
+                flex: 1;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+            }
+            canvas {
+                display: block;
+            }
+            .panel {
+                width: 300px;
+                min-width: 300px;
+                background: #151520;
+                border-left: 1px solid #252535;
+                display: flex;
+                flex-direction: column;
+                gap: 16px;
+                padding: 24px 20px;
+                overflow-y: auto;
+            }
+            .panel h3 {
+                font-size: 16px;
+                margin-bottom: 4px;
+            }
+            .panel p {
+                font-size: 12px;
+                color: #888;
+                line-height: 1.5;
+                margin-bottom: 8px;
+            }
+            .control {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+            }
+            .control label {
+                font-size: 12px;
+                color: #888;
+                display: flex;
+                justify-content: space-between;
+            }
+            .control label span {
+                color: #4f8;
+            }
+            .control input[type="range"] {
+                width: 100%;
+                accent-color: #4f8;
+            }
+            .btn-row {
+                display: flex;
+                gap: 6px;
+            }
+            .btn-row button {
+                flex: 1;
+                background: #1e1e30;
+                color: #e0e0e0;
+                border: 1px solid #333;
+                padding: 8px 12px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 12px;
+                transition: background 0.2s;
+            }
+            .btn-row button:hover {
+                background: #2a2a40;
+            }
+            .btn-row button.active {
+                background: #2a3a2a;
+                border-color: #4f8;
+                color: #4f8;
+            }
+            .stats {
+                font-size: 12px;
+                color: #666;
+                line-height: 1.6;
+            }
+            .stats strong {
+                color: #e0e0e0;
+            }
+            .info-box {
+                background: #0f0f1a;
+                border: 1px solid #252535;
+                border-radius: 8px;
+                padding: 12px;
+                font-size: 12px;
+                color: #aaa;
+                line-height: 1.6;
+            }
+            .info-box code {
+                color: #4f8;
+                font-size: 11px;
+            }
+        </style>
+    </head>
+    <body>
+        <a href="../.." class="back">← Examples</a>
+        <div class="title-bar">🌌 Orbital Mechanics · Kepler's Laws</div>
+        <div class="canvas-wrap">
+            <canvas id="canvas"></canvas>
+        </div>
+        <div class="panel">
+            <h3>Kepler's Laws of Planetary Motion</h3>
+            <p>
+                Drag the sliders to adjust planetary mass, initial velocity and
+                observe how the orbit changes. Kepler's second law states a line
+                joining a planet and the sun sweeps out equal areas during equal
+                intervals of time.
+            </p>
+
+            <div class="control">
+                <label>Planet Mass <span id="mass-val">1.0 M⊕</span></label>
+                <input
+                    type="range"
+                    id="mass"
+                    min="0.1"
+                    max="5"
+                    step="0.1"
+                    value="1"
+                />
+            </div>
+            <div class="control">
+                <label>Initial Speed <span id="speed-val">1.0 v₀</span></label>
+                <input
+                    type="range"
+                    id="speed"
+                    min="0.3"
+                    max="2.5"
+                    step="0.01"
+                    value="1"
+                />
+            </div>
+            <div class="control">
+                <label>Launch Angle <span id="angle-val">90°</span></label>
+                <input
+                    type="range"
+                    id="angle"
+                    min="0"
+                    max="180"
+                    step="1"
+                    value="90"
+                />
+            </div>
+            <div class="control">
+                <label>Zoom <span id="zoom-val">1.0×</span></label>
+                <input
+                    type="range"
+                    id="zoom"
+                    min="0.3"
+                    max="2"
+                    step="0.01"
+                    value="1"
+                />
+            </div>
+
+            <div class="btn-row">
+                <button id="btn-play" class="active">▶ Play</button>
+                <button id="btn-pause">⏸ Pause</button>
+                <button id="btn-reset">↺ Reset</button>
+            </div>
+            <div class="btn-row">
+                <button id="btn-equal-area" class="active">
+                    📐 Show Equal Area
+                </button>
+                <button id="btn-trail">✨ Toggle Trail</button>
+            </div>
+
+            <div class="stats" id="stats">
+                <strong>Orbit Data</strong><br />
+                Semi-major axis: <span id="stat-sma">—</span> AU<br />
+                Eccentricity: <span id="stat-ecc">—</span><br />
+                Period: <span id="stat-per">—</span><br />
+                Current speed: <span id="stat-spd">—</span><br />
+                Area swept: <span id="stat-area">—</span>
+            </div>
+
+            <div class="info-box">
+                <strong>Kepler's Second Law</strong><br />
+                The line connecting the planet to the sun sweeps
+                <em>equal areas in equal times</em>. The green sectors show this
+                — each sector represents the same time interval.<br />
+                <code>v = √(GM(2/r − 1/a))</code> — Vis-viva equation
+            </div>
+        </div>
+
+        <script type="module">
+            import { easing } from "@uploop/timeline";
+            import { blendModes } from "@uploop/compositor";
+
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+
+            // ── State ─────────────────────────────────────────────────────────
+            const G = 200; // gravitational constant (scaled for visualization)
+            const SUN_MASS = 500;
+            let planetMass = 1.0;
+            let initialSpeed = 1.0;
+            let launchAngle = 90;
+            let zoom = 1.0;
+            let playing = true;
+            let showEqualArea = true;
+            let showTrail = true;
+            let time = 0;
+            let dt = 0.016;
+
+            // Planet state
+            let px, py, vx, vy;
+            let trail = [];
+            const MAX_TRAIL = 800;
+
+            function resetOrbit() {
+                px = 200;
+                py = 0;
+                const rad = (launchAngle * Math.PI) / 180;
+                const v0 = initialSpeed * Math.sqrt((G * SUN_MASS) / px);
+                vx = v0 * Math.cos(rad + Math.PI / 2);
+                vy = v0 * Math.sin(rad + Math.PI / 2);
+                time = 0;
+                trail = [{ x: px, y: py, t: 0 }];
+            }
+            resetOrbit();
+
+            // ── Physics ───────────────────────────────────────────────────────
+            function step() {
+                const dx = -px;
+                const dy = -py;
+                const r = Math.sqrt(dx * dx + dy * dy);
+                if (r < 5) return; // collision
+                const f = (G * SUN_MASS * planetMass) / (r * r);
+                const ax = (f * dx) / r / planetMass;
+                const ay = (f * dy) / r / planetMass;
+
+                vx += ax * dt;
+                vy += ay * dt;
+                px += vx * dt;
+                py += vy * dt;
+                time += dt;
+
+                if (time - (trail[trail.length - 1]?.t || 0) > 0.03) {
+                    trail.push({ x: px, y: py, t: time });
+                    if (trail.length > MAX_TRAIL) trail.shift();
+                }
+            }
+
+            // ── Orbit calculation ─────────────────────────────────────────────
+            function getOrbitData() {
+                const r0 = Math.sqrt(px * px + py * py);
+                const v2 = vx * vx + vy * vy;
+                const mu = G * SUN_MASS;
+                const energy = v2 / 2 - mu / r0;
+                const h = px * vy - py * vx;
+
+                if (energy >= 0 || Math.abs(h) < 1e-6) {
+                    return {
+                        sma: Infinity,
+                        ecc: 1,
+                        period: Infinity,
+                        speed: Math.sqrt(v2),
+                    };
+                }
+
+                const a = -mu / (2 * energy);
+                const e = Math.sqrt(Math.max(0, 1 - (h * h) / (mu * a)));
+                const period = 2 * Math.PI * Math.sqrt((a * a * a) / mu);
+                return { sma: a, ecc: e, period, speed: Math.sqrt(v2) };
+            }
+
+            // ── Equal area sector calculation ─────────────────────────────────
+            function getAreaPoints() {
+                const sectorTime = 0.15;
+                const pts1 = [],
+                    pts2 = [];
+                // Forward-integrate from current state
+                let x = px,
+                    y = py,
+                    vvx = vx,
+                    vvy = vy;
+                const subSteps = 20;
+                for (let i = 0; i <= subSteps; i++) {
+                    const t = (sectorTime * i) / subSteps;
+                    const dx = -x,
+                        dy = -y;
+                    const r = Math.sqrt(dx * dx + dy * dy);
+                    if (r < 3) break;
+                    const f = (G * SUN_MASS * planetMass) / (r * r);
+                    vvx +=
+                        ((f * dx) / r / planetMass) * (sectorTime / subSteps);
+                    vvy +=
+                        ((f * dy) / r / planetMass) * (sectorTime / subSteps);
+                    x += vvx * (sectorTime / subSteps);
+                    y += vvy * (sectorTime / subSteps);
+                    pts1.push({ x, y });
+                }
+                // Second sector: another sectorTime interval
+                for (let i = 0; i <= subSteps; i++) {
+                    const t = (sectorTime * i) / subSteps;
+                    const dx = -x,
+                        dy = -y;
+                    const r = Math.sqrt(dx * dx + dy * dy);
+                    if (r < 3) break;
+                    const f = (G * SUN_MASS * planetMass) / (r * r);
+                    vvx +=
+                        ((f * dx) / r / planetMass) * (sectorTime / subSteps);
+                    vvy +=
+                        ((f * dy) / r / planetMass) * (sectorTime / subSteps);
+                    x += vvx * (sectorTime / subSteps);
+                    y += vvy * (sectorTime / subSteps);
+                    pts2.push({ x, y });
+                }
+                return { pts1, pts2 };
+            }
+
+            // ── Draw ──────────────────────────────────────────────────────────
+            function draw() {
+                const w = canvas.width;
+                const h = canvas.height;
+                const cx = w / 2 + px * zoom * 0.3;
+                const cy = h / 2 + py * zoom * 0.3;
+                const sunX = w / 2;
+                const sunY = h / 2;
+
+                ctx.clearRect(0, 0, w, h);
+
+                // Background stars
+                ctx.fillStyle = "rgba(255,255,255,0.15)";
+
+                // Orbit trail
+                if (showTrail && trail.length > 1) {
+                    ctx.strokeStyle = "rgba(100,150,255,0.3)";
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    const tx = w / 2 + trail[0].x * zoom * 0.3;
+                    const ty = h / 2 + trail[0].y * zoom * 0.3;
+                    ctx.moveTo(tx, ty);
+                    for (let i = 1; i < trail.length; i++) {
+                        const ox = w / 2 + trail[i].x * zoom * 0.3;
+                        const oy = h / 2 + trail[i].y * zoom * 0.3;
+                        ctx.lineTo(ox, oy);
+                    }
+                    ctx.stroke();
+                }
+
+                // Equal area sectors
+                if (showEqualArea && trail.length > 60) {
+                    const { pts1, pts2 } = getAreaPoints();
+                    for (const [idx, pts] of [pts1, pts2].entries()) {
+                        if (pts.length < 2) continue;
+                        ctx.fillStyle =
+                            idx === 0
+                                ? "rgba(0,255,100,0.15)"
+                                : "rgba(255,200,0,0.15)";
+                        ctx.beginPath();
+                        ctx.moveTo(sunX, sunY);
+                        for (const p of pts) {
+                            ctx.lineTo(
+                                w / 2 + p.x * zoom * 0.3,
+                                h / 2 + p.y * zoom * 0.3,
+                            );
+                        }
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+
+                // Sun glow
+                const glowGrad = ctx.createRadialGradient(
+                    sunX,
+                    sunY,
+                    5,
+                    sunX,
+                    sunY,
+                    30,
+                );
+                glowGrad.addColorStop(0, "rgba(255,180,30,0.4)");
+                glowGrad.addColorStop(1, "rgba(255,180,30,0)");
+                ctx.fillStyle = glowGrad;
+                ctx.beginPath();
+                ctx.arc(sunX, sunY, 30, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Sun
+                const sunGrad = ctx.createRadialGradient(
+                    sunX - 2,
+                    sunY - 2,
+                    1,
+                    sunX,
+                    sunY,
+                    14,
+                );
+                sunGrad.addColorStop(0, "#fff8c0");
+                sunGrad.addColorStop(0.4, "#ffcc30");
+                sunGrad.addColorStop(1, "#ff8800");
+                ctx.fillStyle = sunGrad;
+                ctx.beginPath();
+                ctx.arc(sunX, sunY, 14, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Planet
+                const pRad = 4 + planetMass * 2;
+                const planetGrad = ctx.createRadialGradient(
+                    cx - 1,
+                    cy - 1,
+                    1,
+                    cx,
+                    cy,
+                    pRad,
+                );
+                planetGrad.addColorStop(0, "#aaddff");
+                planetGrad.addColorStop(0.6, "#4488cc");
+                planetGrad.addColorStop(1, "#224466");
+                ctx.fillStyle = planetGrad;
+                ctx.beginPath();
+                ctx.arc(cx, cy, pRad, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Velocity vector
+                const vMag = Math.sqrt(vx * vx + vy * vy);
+                if (vMag > 0.01) {
+                    const vScale = 30 * zoom;
+                    const vnx = (vx / vMag) * vScale;
+                    const vny = (vy / vMag) * vScale;
+                    ctx.strokeStyle = "#ff6644";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(cx, cy);
+                    ctx.lineTo(cx + vnx, cy + vny);
+                    ctx.stroke();
+                    // Arrowhead
+                    const tipX = cx + vnx;
+                    const tipY = cy + vny;
+                    ctx.fillStyle = "#ff6644";
+                    ctx.beginPath();
+                    ctx.moveTo(tipX, tipY);
+                    ctx.lineTo(
+                        tipX - (5 * vnx) / vMag + (3 * vny) / vMag,
+                        tipY - (5 * vny) / vMag - (3 * vnx) / vMag,
+                    );
+                    ctx.lineTo(
+                        tipX - (5 * vnx) / vMag - (3 * vny) / vMag,
+                        tipY - (5 * vny) / vMag + (3 * vnx) / vMag,
+                    );
+                    ctx.closePath();
+                    ctx.fill();
+                }
+
+                // Semi-major axis line
+                const data = getOrbitData();
+                if (data.sma < Infinity) {
+                    const r = Math.sqrt(px * px + py * py);
+                    const aphelion = data.sma * (1 + data.ecc);
+                    const pxNorm = px / (r || 1);
+                    const pyNorm = py / (r || 1);
+                    ctx.setLineDash([4, 6]);
+                    ctx.strokeStyle = "rgba(255,255,255,0.2)";
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(sunX, sunY);
+                    ctx.lineTo(
+                        sunX - pxNorm * aphelion * zoom * 0.3,
+                        sunY - pyNorm * aphelion * zoom * 0.3,
+                    );
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+
+                    // SMA label
+                    ctx.fillStyle = "rgba(255,255,255,0.4)";
+                    ctx.font = "11px system-ui";
+                    ctx.textAlign = "center";
+                    ctx.fillText(
+                        "SMA",
+                        sunX - pxNorm * aphelion * zoom * 0.15,
+                        sunY - pyNorm * aphelion * zoom * 0.15 - 10,
+                    );
+                }
+
+                // Update stats display
+                const oData = getOrbitData();
+                document.getElementById("stat-sma").textContent =
+                    oData.sma < Infinity ? (oData.sma / 200).toFixed(2) : "∞";
+                document.getElementById("stat-ecc").textContent =
+                    oData.ecc.toFixed(3);
+                document.getElementById("stat-per").textContent =
+                    oData.period < Infinity
+                        ? oData.period.toFixed(1) + "s"
+                        : "∞";
+                document.getElementById("stat-spd").textContent =
+                    oData.speed.toFixed(1);
+                document.getElementById("stat-area").textContent = showEqualArea
+                    ? "sectors visible"
+                    : "hidden";
+            }
+
+            // ── Resize ────────────────────────────────────────────────────────
+            function resize() {
+                canvas.width = canvas.parentElement.clientWidth;
+                canvas.height = canvas.parentElement.clientHeight;
+            }
+
+            // ── Controls ──────────────────────────────────────────────────────
+            const massSlider = document.getElementById("mass");
+            const speedSlider = document.getElementById("speed");
+            const angleSlider = document.getElementById("angle");
+            const zoomSlider = document.getElementById("zoom");
+            const btnPlay = document.getElementById("btn-play");
+            const btnPause = document.getElementById("btn-pause");
+            const btnReset = document.getElementById("btn-reset");
+            const btnEqualArea = document.getElementById("btn-equal-area");
+            const btnTrail = document.getElementById("btn-trail");
+
+            massSlider.addEventListener("input", () => {
+                planetMass = Number(massSlider.value);
+                document.getElementById("mass-val").textContent =
+                    planetMass.toFixed(1) + " M⊕";
+                resetOrbit();
+            });
+
+            speedSlider.addEventListener("input", () => {
+                initialSpeed = Number(speedSlider.value);
+                document.getElementById("speed-val").textContent =
+                    initialSpeed.toFixed(2) + " v₀";
+                resetOrbit();
+            });
+
+            angleSlider.addEventListener("input", () => {
+                launchAngle = Number(angleSlider.value);
+                document.getElementById("angle-val").textContent =
+                    launchAngle + "°";
+                resetOrbit();
+            });
+
+            zoomSlider.addEventListener("input", () => {
+                zoom = Number(zoomSlider.value);
+                document.getElementById("zoom-val").textContent =
+                    zoom.toFixed(2) + "×";
+            });
+
+            btnPlay.addEventListener("click", () => {
+                playing = true;
+                btnPlay.classList.add("active");
+                btnPause.classList.remove("active");
+            });
+
+            btnPause.addEventListener("click", () => {
+                playing = false;
+                btnPause.classList.add("active");
+                btnPlay.classList.remove("active");
+            });
+
+            btnReset.addEventListener("click", () => {
+                massSlider.value = 1;
+                planetMass = 1;
+                document.getElementById("mass-val").textContent = "1.0 M⊕";
+                speedSlider.value = 1;
+                initialSpeed = 1;
+                document.getElementById("speed-val").textContent = "1.00 v₀";
+                angleSlider.value = 90;
+                launchAngle = 90;
+                document.getElementById("angle-val").textContent = "90°";
+                resetOrbit();
+            });
+
+            btnEqualArea.addEventListener("click", () => {
+                showEqualArea = !showEqualArea;
+                btnEqualArea.classList.toggle("active", showEqualArea);
+            });
+
+            btnTrail.addEventListener("click", () => {
+                showTrail = !showTrail;
+                btnTrail.classList.toggle("active", showTrail);
+            });
+
+            // ── Loop ──────────────────────────────────────────────────────────
+            function loop() {
+                if (playing) step();
+                resize();
+                draw();
+                requestAnimationFrame(loop);
+            }
+
+            window.addEventListener("resize", resize);
+            resize();
+            loop();
+
+            console.log(
+                "%c🌌 Orbital Mechanics %c| Kepler's Laws visualization",
+                "color:#4f8",
+                "",
+            );
+            console.log(
+                "  Controls: mass, speed, angle, zoom sliders | play/pause | equal area toggle",
+            );
+        </script>
+    </body>
+</html>

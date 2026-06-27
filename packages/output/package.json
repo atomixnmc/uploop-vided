@@ -1,0 +1,22 @@
+{
+  "name": "@uploop/output",
+  "version": "0.1.0",
+  "description": "Uploop output — WebCodecs encoding, stream output, export presets",
+  "type": "module",
+  "main": "./src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@uploop/compositor": "workspace:*",
+    "@uploop/media": "workspace:*"
+  }
+}
