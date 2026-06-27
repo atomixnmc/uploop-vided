@@ -1,278 +1,552 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Music Circles — uploop-vided</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #0a0a0f; color: #e0e0e0; font-family: system-ui, sans-serif;
-      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
-      padding: 60px 24px 40px; gap: 14px;
-    }
-    .back {
-      position: fixed; top: 16px; left: 16px;
-      color: #888; text-decoration: none; font-size: 14px; z-index: 100;
-    }
-    .back:hover { color: #fff; }
-    .title-bar {
-      width: min(800px, 90vw);
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .title-bar h1 { font-size: 1.25rem; font-weight: 600; color: #4f8; }
-    .title-bar span { font-size: 12px; color: #666; }
-    canvas {
-      width: min(700px, 90vw); height: min(700px, 90vw);
-      background: #151520; border-radius: 12px; border: 1px solid #252535; display: block;
-    }
-    .controls {
-      width: min(800px, 90vw); background: #151520; border-radius: 10px;
-      padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-    }
-    .control-group { display: flex; flex-direction: column; gap: 3px; }
-    .control-group label { font-size: 11px; color: #888; }
-    .control-group .val { font-size: 11px; color: #4f8; font-family: 'Courier New', monospace; }
-    .control-group input[type="range"] { accent-color: #4f8; width: 100px; }
-    button {
-      background: #1e1e30; color: #e0e0e0; border: 1px solid #333;
-      padding: 8px 16px; border-radius: 8px; cursor: pointer;
-      font-size: 13px; transition: all 0.2s; white-space: nowrap;
-    }
-    button:hover { background: #2a2a40; }
-    button.playing { background: #2a3a2a; border-color: #4f8; color: #4f8; }
-    .info-box {
-      width: min(800px, 90vw); background: #0f0f1a; border: 1px solid #252535;
-      border-radius: 8px; padding: 10px 18px; font-size: 12px; color: #aaa;
-      display: flex; gap: 24px; flex-wrap: wrap;
-    }
-    .info-box span { color: #f8c040; font-family: 'Courier New', monospace; }
-    .info-box code { color: #4f8; }
-  </style>
-</head>
-<body>
-  <a href="../.." class="back">← Examples</a>
-  <div id="root"></div>
-
-  <script type="module">
-    import { html, component } from '@uploop/html'
-    import { easing } from '@uploop/timeline'
-    import { blendModes } from '@uploop/compositor'
-
-    const DEFAULT_AUDIO = 'https://www.samplelib.com/lib/preview/mp3/sample-15s.mp3'
-
-    const MusicCircles = component('MusicCircles', {
-      state: {
-        playing: false, volume: 0.7, bassEnergy: 0, rotation: 0,
-        rayCount: 96, uploadLabel: 'Load Audio',
-      },
-      update: {
-        togglePlay: (s) => ({ ...s, playing: !s.playing }),
-        setPlaying: (s, p) => ({ ...s, playing: p }),
-        setVolume: (s, v) => ({ ...s, volume: v }),
-        setBassEnergy: (s, v) => ({ ...s, bassEnergy: v }),
-        setRotation: (s, v) => ({ ...s, rotation: v }),
-        setLabel: (s, l) => ({ ...s, uploadLabel: l }),
-      },
-      view: (state, { send }) => html`
-        <div class="title-bar">
-          <h1>🔵 Music Circles — Circular Spectrum</h1>
-          <span>Radial FFT · Bass-Reactive Pulse</span>
-        </div>
-        <canvas id="viz"></canvas>
-        <div class="controls">
-          <button id="playBtn" class="${state.playing ? 'playing' : ''}" onclick=${() => send('togglePlay')}>
-            ${state.playing ? '⏸ Pause' : '▶ Play'}
-          </button>
-          <div class="control-group">
-            <label>Volume <span class="val">${(state.volume * 100).toFixed(0)}%</span></label>
-            <input type="range" id="volSlider" min="0" max="1" step="0.05" value="${state.volume}"
-              oninput=${(e) => send('setVolume', Number(e.target.value))} />
-          </div>
-          <label for="fileUpload" style="cursor:pointer; background:#1e1e30; color:#e0e0e0; border:1px solid #333; padding:8px 16px; border-radius:8px; font-size:13px;">
-            📁 ${state.uploadLabel}
-          </label>
-          <input type="file" id="fileUpload" accept="audio/*" style="display:none"
-            onchange=${(e) => { const f = e.target.files?.[0]; if (f) { send('setLabel', f.name); send('loadFile', f) } }} />
-        </div>
-        <div class="info-box">
-          <div>Bass Energy: <span id="bassInfo">0.00</span></div>
-          <div>Rotation: <span id="rotInfo">0.0°</span></div>
-          <div>Using <code>@uploop/timeline</code> · <code>@uploop/compositor</code></div>
-        </div>
-      `,
-      mount(el, ctx) {
-        const canvas = el.querySelector('#viz')
-        const c = canvas.getContext('2d')
-        let audioCtx, analyser, source, audioEl, dataArray, smoothed = []
-        let rotation = 0, bassEnergy = 0
-
-        function resize() {
-          const rect = canvas.getBoundingClientRect()
-          canvas.width = rect.width * devicePixelRatio
-          canvas.height = rect.height * devicePixelRatio
-        }
-
-        async function loadDefaultAudio() {
-          try {
-            const res = await fetch(DEFAULT_AUDIO)
-            const blob = await res.blob()
-            loadAudio(URL.createObjectURL(blob))
-            ctx.send('setLabel', 'Sample MP3')
-          } catch (e) { console.warn('Default audio load failed:', e.message) }
-        }
-
-        function loadAudio(url) {
-          stopAudio()
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-          analyser = audioCtx.createAnalyser()
-          analyser.fftSize = 2048
-          analyser.smoothingTimeConstant = 0.65
-          audioEl = new Audio(url)
-          audioEl.crossOrigin = 'anonymous'; audioEl.loop = true; audioEl.volume = ctx.get().volume
-          source = audioCtx.createMediaElementSource(audioEl)
-          const gain = audioCtx.createGain(); gain.gain.value = ctx.get().volume
-          source.connect(gain); gain.connect(analyser); analyser.connect(audioCtx.destination)
-          dataArray = new Uint8Array(analyser.frequencyBinCount)
-          smoothed = new Array(ctx.get().rayCount).fill(0)
-          audioEl.play(); ctx.send('setPlaying', true); resize(); loop()
-        }
-
-        function stopAudio() {
-          cancelAnimationFrame(loadDefaultAudio._raf)
-          if (audioEl) { audioEl.pause(); audioEl.src = '' }
-          if (source) source.disconnect()
-          if (audioCtx && audioCtx.state !== 'closed') audioCtx.close()
-          audioEl = null; source = null; analyser = null; audioCtx = null
-        }
-
-        function render() {
-          const W = canvas.width, H = canvas.height
-          c.clearRect(0, 0, W, H)
-          if (!analyser) return
-
-          const cx = W / 2, cy = H / 2
-          const maxR = Math.min(W, H) * 0.42
-          const rayCount = ctx.get().rayCount
-          analyser.getByteFrequencyData(dataArray)
-
-          const totalBins = analyser.frequencyBinCount
-          const sampleRate = audioCtx.sampleRate
-          const nyquist = sampleRate / 2
-          const minF = 20, maxF = nyquist * 0.85
-          const logMin = Math.log2(minF), logMax = Math.log2(maxF)
-
-          // Bass energy (lowest 10% of spectrum)
-          let bassSum = 0
-          for (let i = 0; i < totalBins * 0.1; i++) bassSum += dataArray[i] / 255
-          bassEnergy = bassSum / (totalBins * 0.1)
-
-          // Rotation from mid frequencies
-          let midSum = 0
-          for (let i = Math.floor(totalBins * 0.1); i < Math.floor(totalBins * 0.4); i++)
-            midSum += dataArray[i] / 255
-          const midNorm = midSum / (totalBins * 0.3)
-          rotation += midNorm * 0.01 + 0.0008
-
-          // Draw concentric ring glow (bass pulse)
-          const pulseR = maxR * (0.85 + bassEnergy * 0.3)
-          const bassGlow = c.createRadialGradient(cx, cy, pulseR * 0.8, cx, cy, pulseR)
-          bassGlow.addColorStop(0, `rgba(250,60,30,0)`)
-          bassGlow.addColorStop(0.5, `rgba(250,60,30,${bassEnergy * 0.25})`)
-          bassGlow.addColorStop(1, `rgba(250,60,30,0)`)
-          c.fillStyle = bassGlow
-          c.beginPath(); c.arc(cx, cy, pulseR, 0, Math.PI * 2); c.fill()
-
-          // Draw radial bars
-          for (let i = 0; i < rayCount; i++) {
-            const t = i / rayCount
-            const freq = Math.pow(2, logMin + t * (logMax - logMin))
-            const idx = Math.min(Math.floor(freq / nyquist * totalBins), totalBins - 1)
-            let val = dataArray[idx] / 255
-
-            smoothed[i] = smoothed[i] * 0.72 + val * 0.28
-            const r = smoothed[i] * maxR
-            const angle = (i / rayCount) * Math.PI * 2 + rotation
-
-            const hue = t * 300 + 200 // blue → magenta → red
-            const sat = 70 + val * 30
-            const lum = 45 + smoothed[i] * 35
-
-            // Ray
-            const startR = maxR * 0.08
-            const endR = startR + r
-            c.strokeStyle = `hsl(${hue % 360},${sat}%,${lum}%)`
-            c.lineWidth = Math.max(1.5, (maxR * Math.PI * 2 / rayCount) * 0.7)
-            c.globalAlpha = 0.85
-            c.beginPath()
-            c.moveTo(cx + Math.cos(angle) * startR, cy + Math.sin(angle) * startR)
-            c.lineTo(cx + Math.cos(angle) * endR, cy + Math.sin(angle) * endR)
-            c.stroke()
-
-            // End dot glow
-            if (smoothed[i] > 0.15) {
-              c.fillStyle = `hsl(${hue % 360},90%,70%)`
-              c.globalAlpha = smoothed[i] * 0.6
-              c.beginPath()
-              c.arc(cx + Math.cos(angle) * endR, cy + Math.sin(angle) * endR, 3, 0, Math.PI * 2)
-              c.fill()
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Music Circles — uploop-vided</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
             }
-          }
-          c.globalAlpha = 1
+            body {
+                background: #0a0a0f;
+                color: #e0e0e0;
+                font-family: system-ui, sans-serif;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 60px 24px 40px;
+                gap: 14px;
+            }
+            .back {
+                position: fixed;
+                top: 16px;
+                left: 16px;
+                color: #888;
+                text-decoration: none;
+                font-size: 14px;
+                z-index: 100;
+            }
+            .back:hover {
+                color: #fff;
+            }
+            .title-bar {
+                width: min(800px, 90vw);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            .title-bar h1 {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: #4f8;
+            }
+            .title-bar span {
+                font-size: 12px;
+                color: #666;
+            }
+            canvas {
+                width: min(700px, 90vw);
+                height: min(700px, 90vw);
+                background: #151520;
+                border-radius: 12px;
+                border: 1px solid #252535;
+                display: block;
+            }
+            .controls {
+                width: min(800px, 90vw);
+                background: #151520;
+                border-radius: 10px;
+                padding: 14px 20px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                align-items: center;
+            }
+            .control-group {
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+            }
+            .control-group label {
+                font-size: 11px;
+                color: #888;
+            }
+            .control-group .val {
+                font-size: 11px;
+                color: #4f8;
+                font-family: "Courier New", monospace;
+            }
+            .control-group input[type="range"] {
+                accent-color: #4f8;
+                width: 100px;
+            }
+            button {
+                background: #1e1e30;
+                color: #e0e0e0;
+                border: 1px solid #333;
+                padding: 8px 16px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 13px;
+                transition: all 0.2s;
+                white-space: nowrap;
+            }
+            button:hover {
+                background: #2a2a40;
+            }
+            button.playing {
+                background: #2a3a2a;
+                border-color: #4f8;
+                color: #4f8;
+            }
+            .info-box {
+                width: min(800px, 90vw);
+                background: #0f0f1a;
+                border: 1px solid #252535;
+                border-radius: 8px;
+                padding: 10px 18px;
+                font-size: 12px;
+                color: #aaa;
+                display: flex;
+                gap: 24px;
+                flex-wrap: wrap;
+            }
+            .info-box span {
+                color: #f8c040;
+                font-family: "Courier New", monospace;
+            }
+            .info-box code {
+                color: #4f8;
+            }
+        </style>
+    </head>
+    <body>
+        <a href="../.." class="back">← Examples</a>
+        <div id="root"></div>
 
-          // Center circle
-          const centerGrad = c.createRadialGradient(cx, cy, 0, cx, cy, maxR * 0.1)
-          centerGrad.addColorStop(0, 'rgba(10,10,20,1)')
-          centerGrad.addColorStop(1, 'rgba(15,15,30,0.7)')
-          c.fillStyle = centerGrad
-          c.beginPath(); c.arc(cx, cy, maxR * 0.08, 0, Math.PI * 2); c.fill()
+        <script type="module">
+            import { html, component } from "@uploop/html";
+            import { easing } from "@uploop/timeline";
+            import { blendModes } from "@uploop/compositor";
 
-          // Outer ring
-          c.strokeStyle = '#252535'
-          c.lineWidth = 1.5
-          c.beginPath(); c.arc(cx, cy, maxR, 0, Math.PI * 2); c.stroke()
+            // AUDIO_SOURCE = 'oscillator' — self-contained Web Audio, no CORS
 
-          // Frequency labels
-          c.fillStyle = '#555'
-          c.font = '9px monospace'
-          const labels = [{ f: 50, t: (Math.log2(50) - logMin) / (logMax - logMin) },
-            { f: 500, t: (Math.log2(500) - logMin) / (logMax - logMin) },
-            { f: 5000, t: (Math.log2(5000) - logMin) / (logMax - logMin) }]
-          for (const l of labels) {
-            const a = l.t * Math.PI * 2 - Math.PI / 2 + rotation
-            const lx = cx + Math.cos(a) * (maxR + 14)
-            const ly = cy + Math.sin(a) * (maxR + 14)
-            const lbl = l.f >= 1000 ? `${(l.f / 1000).toFixed(0)}k` : `${l.f}`
-            c.fillText(lbl, lx - 10, ly + 4)
-          }
+            const MusicCircles = component("MusicCircles", {
+                state: {
+                    playing: true,
+                    volume: 0.7,
+                    bassEnergy: 0,
+                    rotation: 0,
+                    rayCount: 96,
+                    uploadLabel: "Self-oscillating",
+                },
+                update: {
+                    togglePlay: (s) => ({ ...s, playing: !s.playing }),
+                    setPlaying: (s, p) => ({ ...s, playing: p }),
+                    setVolume: (s, v) => ({ ...s, volume: v }),
+                    setBassEnergy: (s, v) => ({ ...s, bassEnergy: v }),
+                    setRotation: (s, v) => ({ ...s, rotation: v }),
+                    setLabel: (s, l) => ({ ...s, uploadLabel: l }),
+                },
+                view: (state, { send }) => html`
+                    <div class="title-bar">
+                        <h1>🔵 Music Circles — Circular Spectrum</h1>
+                        <span>Radial FFT · Bass-Reactive Pulse</span>
+                    </div>
+                    <canvas id="viz"></canvas>
+                    <div class="controls">
+                        <button
+                            id="playBtn"
+                            class="${state.playing ? "playing" : ""}"
+                            onclick=${() => send("togglePlay")}
+                        >
+                            ${state.playing ? "⏸ Pause" : "▶ Play"}
+                        </button>
+                        <div class="control-group">
+                            <label
+                                >Volume
+                                <span class="val"
+                                    >${(state.volume * 100).toFixed(0)}%</span
+                                ></label
+                            >
+                            <input
+                                type="range"
+                                id="volSlider"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value="${state.volume}"
+                                oninput=${(e) =>
+                                    send("setVolume", Number(e.target.value))}
+                            />
+                        </div>
+                        <label
+                            for="fileUpload"
+                            style="cursor:pointer; background:#1e1e30; color:#e0e0e0; border:1px solid #333; padding:8px 16px; border-radius:8px; font-size:13px;"
+                        >
+                            📁 ${state.uploadLabel}
+                        </label>
+                        <input
+                            type="file"
+                            id="fileUpload"
+                            accept="audio/*"
+                            style="display:none"
+                            onchange=${(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) {
+                                    send("setLabel", f.name);
+                                    send("loadFile", f);
+                                }
+                            }}
+                        />
+                    </div>
+                    <div class="info-box">
+                        <div>Bass Energy: <span id="bassInfo">0.00</span></div>
+                        <div>Rotation: <span id="rotInfo">0.0°</span></div>
+                        <div>
+                            Using <code>@uploop/timeline</code> ·
+                            <code>@uploop/compositor</code>
+                        </div>
+                    </div>
+                `,
+                mount(el, ctx) {
+                    const canvas = el.querySelector("#viz");
+                    const c = canvas.getContext("2d");
+                    let audioCtx,
+                        analyser,
+                        gainNode,
+                        source,
+                        audioEl,
+                        dataArray,
+                        smoothed = [];
+                    let oscNodes = null;
+                    let rotation = 0,
+                        bassEnergy = 0;
 
-          el.querySelector('#bassInfo').textContent = bassEnergy.toFixed(3)
-          el.querySelector('#rotInfo').textContent = (rotation * 180 / Math.PI % 360).toFixed(1)
-        }
+                    function resize() {
+                        const rect = canvas.getBoundingClientRect();
+                        canvas.width = rect.width * devicePixelRatio;
+                        canvas.height = rect.height * devicePixelRatio;
+                    }
 
-        function loop() {
-          render()
-          loadDefaultAudio._raf = requestAnimationFrame(loop)
-        }
+                    function createOscillator(audioCtx, dest) {
+                        const osc = audioCtx.createOscillator();
+                        const mod = audioCtx.createOscillator();
+                        const modGain = audioCtx.createGain();
 
-        const origSend = ctx.send
-        ctx.send = function(action, payload) {
-          if (action === 'loadFile' && payload) { loadAudio(URL.createObjectURL(payload)) }
-          if (action === 'setVolume') { if (audioEl) audioEl.volume = payload }
-          if (action === 'togglePlay') {
-            if (audioEl) { audioEl.paused ? audioEl.play() : audioEl.pause(); origSend('setPlaying', !audioEl.paused) }
-            else loadDefaultAudio()
-          }
-          origSend(action, payload)
-        }
+                        osc.type = "sawtooth";
+                        osc.frequency.value = 55;
 
-        loadDefaultAudio()
-        window.addEventListener('resize', resize)
-        return () => { stopAudio(); window.removeEventListener('resize', resize) }
-      }
-    })
+                        mod.type = "sine";
+                        mod.frequency.value = 110;
+                        modGain.gain.value = 200;
 
-    MusicCircles.mount(document.getElementById('root'))
-  </script>
-</body>
+                        mod.connect(modGain);
+                        modGain.connect(osc.frequency);
+                        osc.connect(dest);
+
+                        osc.start();
+                        mod.start();
+                        return { osc, mod, modGain };
+                    }
+
+                    function initAudio() {
+                        stopAudio();
+                        audioCtx = new (
+                            window.AudioContext || window.webkitAudioContext
+                        )();
+                        analyser = audioCtx.createAnalyser();
+                        analyser.fftSize = 2048;
+                        analyser.smoothingTimeConstant = 0.65;
+
+                        gainNode = audioCtx.createGain();
+                        gainNode.gain.value = ctx.get().volume;
+
+                        oscNodes = createOscillator(audioCtx, analyser);
+                        analyser.connect(gainNode);
+                        gainNode.connect(audioCtx.destination);
+
+                        dataArray = new Uint8Array(analyser.frequencyBinCount);
+                        smoothed = new Array(ctx.get().rayCount).fill(0);
+
+                        resize();
+                        loop();
+                    }
+
+                    function loadAudio(url) {
+                        stopAudio();
+                        audioCtx = new (
+                            window.AudioContext || window.webkitAudioContext
+                        )();
+                        analyser = audioCtx.createAnalyser();
+                        analyser.fftSize = 2048;
+                        analyser.smoothingTimeConstant = 0.65;
+                        audioEl = new Audio(url);
+                        audioEl.crossOrigin = "anonymous";
+                        audioEl.loop = true;
+                        audioEl.volume = ctx.get().volume;
+                        source = audioCtx.createMediaElementSource(audioEl);
+                        gainNode = audioCtx.createGain();
+                        gainNode.gain.value = ctx.get().volume;
+                        source.connect(gainNode);
+                        gainNode.connect(analyser);
+                        analyser.connect(audioCtx.destination);
+                        dataArray = new Uint8Array(analyser.frequencyBinCount);
+                        smoothed = new Array(ctx.get().rayCount).fill(0);
+                        audioEl.play();
+                        ctx.send("setPlaying", true);
+                        resize();
+                        loop();
+                    }
+
+                    function stopAudio() {
+                        if (loop._raf) cancelAnimationFrame(loop._raf);
+                        if (oscNodes) {
+                            try {
+                                oscNodes.osc.stop();
+                                oscNodes.mod.stop();
+                            } catch (_) {}
+                            oscNodes = null;
+                        }
+                        if (audioEl) {
+                            audioEl.pause();
+                            audioEl.src = "";
+                        }
+                        if (source) source.disconnect();
+                        if (audioCtx && audioCtx.state !== "closed")
+                            audioCtx.close();
+                        audioEl = null;
+                        source = null;
+                        analyser = null;
+                        gainNode = null;
+                        audioCtx = null;
+                    }
+
+                    function render() {
+                        const W = canvas.width,
+                            H = canvas.height;
+                        c.clearRect(0, 0, W, H);
+                        if (!analyser) return;
+
+                        const cx = W / 2,
+                            cy = H / 2;
+                        const maxR = Math.min(W, H) * 0.42;
+                        const rayCount = ctx.get().rayCount;
+                        analyser.getByteFrequencyData(dataArray);
+
+                        const totalBins = analyser.frequencyBinCount;
+                        const sampleRate = audioCtx.sampleRate;
+                        const nyquist = sampleRate / 2;
+                        const minF = 20,
+                            maxF = nyquist * 0.85;
+                        const logMin = Math.log2(minF),
+                            logMax = Math.log2(maxF);
+
+                        // Bass energy (lowest 10% of spectrum)
+                        let bassSum = 0;
+                        for (let i = 0; i < totalBins * 0.1; i++)
+                            bassSum += dataArray[i] / 255;
+                        bassEnergy = bassSum / (totalBins * 0.1);
+
+                        // Rotation from mid frequencies
+                        let midSum = 0;
+                        for (
+                            let i = Math.floor(totalBins * 0.1);
+                            i < Math.floor(totalBins * 0.4);
+                            i++
+                        )
+                            midSum += dataArray[i] / 255;
+                        const midNorm = midSum / (totalBins * 0.3);
+                        rotation += midNorm * 0.01 + 0.0008;
+
+                        // Draw concentric ring glow (bass pulse)
+                        const pulseR = maxR * (0.85 + bassEnergy * 0.3);
+                        const bassGlow = c.createRadialGradient(
+                            cx,
+                            cy,
+                            pulseR * 0.8,
+                            cx,
+                            cy,
+                            pulseR,
+                        );
+                        bassGlow.addColorStop(0, `rgba(250,60,30,0)`);
+                        bassGlow.addColorStop(
+                            0.5,
+                            `rgba(250,60,30,${bassEnergy * 0.25})`,
+                        );
+                        bassGlow.addColorStop(1, `rgba(250,60,30,0)`);
+                        c.fillStyle = bassGlow;
+                        c.beginPath();
+                        c.arc(cx, cy, pulseR, 0, Math.PI * 2);
+                        c.fill();
+
+                        // Draw radial bars
+                        for (let i = 0; i < rayCount; i++) {
+                            const t = i / rayCount;
+                            const freq = Math.pow(
+                                2,
+                                logMin + t * (logMax - logMin),
+                            );
+                            const idx = Math.min(
+                                Math.floor((freq / nyquist) * totalBins),
+                                totalBins - 1,
+                            );
+                            let val = dataArray[idx] / 255;
+
+                            smoothed[i] = smoothed[i] * 0.72 + val * 0.28;
+                            const r = smoothed[i] * maxR;
+                            const angle =
+                                (i / rayCount) * Math.PI * 2 + rotation;
+
+                            const hue = t * 300 + 200; // blue → magenta → red
+                            const sat = 70 + val * 30;
+                            const lum = 45 + smoothed[i] * 35;
+
+                            // Ray
+                            const startR = maxR * 0.08;
+                            const endR = startR + r;
+                            c.strokeStyle = `hsl(${hue % 360},${sat}%,${lum}%)`;
+                            c.lineWidth = Math.max(
+                                1.5,
+                                ((maxR * Math.PI * 2) / rayCount) * 0.7,
+                            );
+                            c.globalAlpha = 0.85;
+                            c.beginPath();
+                            c.moveTo(
+                                cx + Math.cos(angle) * startR,
+                                cy + Math.sin(angle) * startR,
+                            );
+                            c.lineTo(
+                                cx + Math.cos(angle) * endR,
+                                cy + Math.sin(angle) * endR,
+                            );
+                            c.stroke();
+
+                            // End dot glow
+                            if (smoothed[i] > 0.15) {
+                                c.fillStyle = `hsl(${hue % 360},90%,70%)`;
+                                c.globalAlpha = smoothed[i] * 0.6;
+                                c.beginPath();
+                                c.arc(
+                                    cx + Math.cos(angle) * endR,
+                                    cy + Math.sin(angle) * endR,
+                                    3,
+                                    0,
+                                    Math.PI * 2,
+                                );
+                                c.fill();
+                            }
+                        }
+                        c.globalAlpha = 1;
+
+                        // Center circle
+                        const centerGrad = c.createRadialGradient(
+                            cx,
+                            cy,
+                            0,
+                            cx,
+                            cy,
+                            maxR * 0.1,
+                        );
+                        centerGrad.addColorStop(0, "rgba(10,10,20,1)");
+                        centerGrad.addColorStop(1, "rgba(15,15,30,0.7)");
+                        c.fillStyle = centerGrad;
+                        c.beginPath();
+                        c.arc(cx, cy, maxR * 0.08, 0, Math.PI * 2);
+                        c.fill();
+
+                        // Outer ring
+                        c.strokeStyle = "#252535";
+                        c.lineWidth = 1.5;
+                        c.beginPath();
+                        c.arc(cx, cy, maxR, 0, Math.PI * 2);
+                        c.stroke();
+
+                        // Frequency labels
+                        c.fillStyle = "#555";
+                        c.font = "9px monospace";
+                        const labels = [
+                            {
+                                f: 50,
+                                t: (Math.log2(50) - logMin) / (logMax - logMin),
+                            },
+                            {
+                                f: 500,
+                                t:
+                                    (Math.log2(500) - logMin) /
+                                    (logMax - logMin),
+                            },
+                            {
+                                f: 5000,
+                                t:
+                                    (Math.log2(5000) - logMin) /
+                                    (logMax - logMin),
+                            },
+                        ];
+                        for (const l of labels) {
+                            const a =
+                                l.t * Math.PI * 2 - Math.PI / 2 + rotation;
+                            const lx = cx + Math.cos(a) * (maxR + 14);
+                            const ly = cy + Math.sin(a) * (maxR + 14);
+                            const lbl =
+                                l.f >= 1000
+                                    ? `${(l.f / 1000).toFixed(0)}k`
+                                    : `${l.f}`;
+                            c.fillText(lbl, lx - 10, ly + 4);
+                        }
+
+                        el.querySelector("#bassInfo").textContent =
+                            bassEnergy.toFixed(3);
+                        el.querySelector("#rotInfo").textContent = (
+                            ((rotation * 180) / Math.PI) %
+                            360
+                        ).toFixed(1);
+                    }
+
+                    function loop() {
+                        render();
+                        loop._raf = requestAnimationFrame(loop);
+                    }
+
+                    const origSend = ctx.send;
+                    ctx.send = function (action, payload) {
+                        if (action === "loadFile" && payload) {
+                            loadAudio(URL.createObjectURL(payload));
+                        }
+                        if (action === "setVolume") {
+                            if (gainNode) gainNode.gain.value = payload;
+                            if (audioEl) audioEl.volume = payload;
+                        }
+                        if (action === "togglePlay") {
+                            if (audioCtx) {
+                                if (audioCtx.state === "running") {
+                                    audioCtx.suspend();
+                                    origSend("setPlaying", false);
+                                } else {
+                                    audioCtx.resume();
+                                    origSend("setPlaying", true);
+                                }
+                            } else {
+                                initAudio();
+                            }
+                        }
+                        origSend(action, payload);
+                    };
+
+                    initAudio();
+                    window.addEventListener("resize", resize);
+                    return () => {
+                        stopAudio();
+                        window.removeEventListener("resize", resize);
+                    };
+                },
+            });
+
+            MusicCircles.mount(document.getElementById("root"));
+        </script>
+    </body>
 </html>

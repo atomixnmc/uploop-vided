@@ -1,306 +1,655 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Music Waves — uploop-vided</title>
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      background: #0a0a0f; color: #e0e0e0; font-family: system-ui, sans-serif;
-      min-height: 100vh; display: flex; flex-direction: column; align-items: center;
-      padding: 60px 24px 40px; gap: 14px;
-    }
-    .back { position: fixed; top: 16px; left: 16px; color: #888; text-decoration: none; font-size: 14px; z-index: 100; }
-    .back:hover { color: #fff; }
-    .title-bar { width: min(960px, 90vw); display: flex; align-items: center; justify-content: space-between; }
-    .title-bar h1 { font-size: 1.25rem; font-weight: 600; color: #4f8; }
-    .title-bar span { font-size: 12px; color: #666; }
-    canvas {
-      width: min(960px, 90vw); height: 380px;
-      background: #151520; border-radius: 12px; border: 1px solid #252535; display: block;
-    }
-    .controls {
-      width: min(960px, 90vw); background: #151520; border-radius: 10px;
-      padding: 14px 20px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-    }
-    .control-group { display: flex; flex-direction: column; gap: 3px; }
-    .control-group label { font-size: 11px; color: #888; }
-    .control-group .val { font-size: 11px; color: #4f8; font-family: 'Courier New', monospace; }
-    .control-group input[type="range"] { accent-color: #4f8; width: 100px; }
-    button {
-      background: #1e1e30; color: #e0e0e0; border: 1px solid #333;
-      padding: 8px 16px; border-radius: 8px; cursor: pointer;
-      font-size: 13px; transition: all 0.2s; white-space: nowrap;
-    }
-    button:hover { background: #2a2a40; }
-    button.playing { background: #2a3a2a; border-color: #4f8; color: #4f8; }
-    button.mode-active { background: #2a3a2a; border-color: #4f8; color: #4f8; }
-    .mode-btns { display: flex; gap: 4px; }
-    .mode-btns button { padding: 6px 12px; font-size: 11px; }
-    .info-box {
-      width: min(960px, 90vw); background: #0f0f1a; border: 1px solid #252535;
-      border-radius: 8px; padding: 10px 18px; font-size: 12px; color: #aaa;
-      display: flex; gap: 24px; flex-wrap: wrap;
-    }
-    .info-box span { color: #f8c040; font-family: 'Courier New', monospace; }
-    .info-box code { color: #4f8; }
-  </style>
-</head>
-<body>
-  <a href="../.." class="back">← Examples</a>
-  <div id="root"></div>
-
-  <script type="module">
-    import { html, component } from '@uploop/html'
-    import { easing } from '@uploop/timeline'
-    import { blendModes } from '@uploop/compositor'
-
-    const DEFAULT_AUDIO = 'https://www.samplelib.com/lib/preview/mp3/sample-15s.mp3'
-
-    const MusicWaves = component('MusicWaves', {
-      state: {
-        playing: false, volume: 0.7, mode: 'line', showStereo: false,
-        ampL: 0, ampR: 0, uploadLabel: 'Load Audio',
-      },
-      update: {
-        togglePlay: (s) => ({ ...s, playing: !s.playing }),
-        setPlaying: (s, p) => ({ ...s, playing: p }),
-        setVolume: (s, v) => ({ ...s, volume: v }),
-        setMode: (s, m) => ({ ...s, mode: m }),
-        toggleStereo: (s) => ({ ...s, showStereo: !s.showStereo }),
-        setAmps: (s, l, r) => ({ ...s, ampL: l, ampR: r }),
-        setLabel: (s, l) => ({ ...s, uploadLabel: l }),
-      },
-      view: (state, { send }) => html`
-        <div class="title-bar">
-          <h1>📊 Music Waves — Waveform Oscilloscope</h1>
-          <span>Time-Domain · Stereo · Multi-Mode</span>
-        </div>
-        <canvas id="viz"></canvas>
-        <div class="controls">
-          <button id="playBtn" class="${state.playing ? 'playing' : ''}" onclick=${() => send('togglePlay')}>
-            ${state.playing ? '⏸ Pause' : '▶ Play'}
-          </button>
-          <div class="mode-btns">
-            ${[{ k: 'line', n: 'Line' }, { k: 'filled', n: 'Filled' }, { k: 'dots', n: 'Dots' }].map(m => html`
-              <button class="${state.mode === m.k ? 'mode-active' : ''}" onclick=${() => send('setMode', m.k)}>${m.n}</button>
-            `)}
-          </div>
-          <button class="${state.showStereo ? 'mode-active' : ''}" onclick=${() => send('toggleStereo')}>
-            ${state.showStereo ? '🔊 Stereo' : '🔉 Mono'}
-          </button>
-          <div class="control-group">
-            <label>Volume <span class="val">${(state.volume * 100).toFixed(0)}%</span></label>
-            <input type="range" min="0" max="1" step="0.05" value="${state.volume}"
-              oninput=${(e) => send('setVolume', Number(e.target.value))} />
-          </div>
-          <label for="fileUpload" style="cursor:pointer; background:#1e1e30; color:#e0e0e0; border:1px solid #333; padding:8px 16px; border-radius:8px; font-size:13px;">
-            📁 ${state.uploadLabel}
-          </label>
-          <input type="file" id="fileUpload" accept="audio/*" style="display:none"
-            onchange=${(e) => { const f = e.target.files?.[0]; if (f) { send('setLabel', f.name); send('loadFile', f) } }} />
-        </div>
-        <div class="info-box">
-          <div>L Amp: <span id="ampL">0.00</span></div>
-          <div>R Amp: <span id="ampR">0.00</span></div>
-          <div>Using <code>@uploop/timeline</code> · <code>@uploop/compositor</code></div>
-        </div>
-      `,
-      mount(el, ctx) {
-        const canvas = el.querySelector('#viz')
-        const c = canvas.getContext('2d')
-        let audioCtx, analyser, source, audioEl, dataArray, stereoLR
-        let historyL = [], historyR = []
-
-        function resize() {
-          const rect = canvas.getBoundingClientRect()
-          canvas.width = rect.width * devicePixelRatio
-          canvas.height = rect.height * devicePixelRatio
-        }
-
-        async function loadDefaultAudio() {
-          try {
-            const res = await fetch(DEFAULT_AUDIO)
-            loadAudio(URL.createObjectURL(await res.blob()))
-            ctx.send('setLabel', 'Sample MP3')
-          } catch (e) { console.warn('Default audio load failed:', e.message) }
-        }
-
-        function loadAudio(url) {
-          stopAudio()
-          audioCtx = new (window.AudioContext || window.webkitAudioContext)()
-          analyser = audioCtx.createAnalyser()
-          analyser.fftSize = 2048
-          analyser.smoothingTimeConstant = 0.5
-          audioEl = new Audio(url)
-          audioEl.crossOrigin = 'anonymous'; audioEl.loop = true; audioEl.volume = ctx.get().volume
-          source = audioCtx.createMediaElementSource(audioEl)
-
-          // Splitter for stereo
-          const splitter = audioCtx.createChannelSplitter(2)
-          const merger = audioCtx.createChannelMerger(2)
-          const analyserL = audioCtx.createAnalyser()
-          const analyserR = audioCtx.createAnalyser()
-          analyserL.fftSize = 2048; analyserR.fftSize = 2048
-
-          source.connect(splitter)
-          splitter.connect(analyserL, 0)
-          splitter.connect(analyserR, 1)
-          analyserL.connect(merger, 0, 0)
-          analyserR.connect(merger, 0, 1)
-          merger.connect(audioCtx.destination)
-
-          // Store both analyzers
-          stereoLR = { l: analyserL, r: analyserR, mono: analyser }
-          // Mono path for summary
-          const gain = audioCtx.createGain()
-          source.connect(gain)
-          gain.connect(analyser)
-          analyser.connect(audioCtx.destination)
-
-          dataArray = new Uint8Array(analyser.frequencyBinCount)
-          audioEl.play(); ctx.send('setPlaying', true); resize(); loop()
-        }
-
-        function stopAudio() {
-          if (loop._raf) cancelAnimationFrame(loop._raf)
-          if (audioEl) { audioEl.pause(); audioEl.src = '' }
-          if (source) source.disconnect()
-          if (audioCtx && audioCtx.state !== 'closed') audioCtx.close()
-          audioEl = null; source = null; analyser = null; audioCtx = null; stereoLR = null
-        }
-
-        function drawGrid(W, H) {
-          c.strokeStyle = '#1a1a28'
-          c.lineWidth = 0.5
-          const midY = ctx.get().showStereo ? H * 0.25 : H / 2
-          c.beginPath(); c.moveTo(0, midY); c.lineTo(W, midY); c.stroke()
-          if (ctx.get().showStereo) {
-            c.beginPath(); c.moveTo(0, H * 0.75); c.lineTo(W, H * 0.75); c.stroke()
-          }
-          // dB labels
-          c.fillStyle = '#444'
-          c.font = '9px monospace'
-          c.fillText('0 dB', 4, 12)
-          if (ctx.get().showStereo) {
-            c.fillText('L', 4, H * 0.25 - 4)
-            c.fillText('R', 4, H * 0.75 - 4)
-          }
-        }
-
-        function render() {
-          const W = canvas.width, H = canvas.height
-          c.clearRect(0, 0, W, H)
-          if (!analyser || !stereoLR) return
-
-          const mode = ctx.get().mode
-          const stereo = ctx.get().showStereo
-
-          analyser.getByteTimeDomainData(dataArray)
-          const monoData = new Uint8Array(analyser.fftSize / 2) // freq bins
-
-          function drawWave(data, yOff, hScale, color) {
-            const bufLen = data.length
-            const midY = yOff
-            const halfH = hScale
-
-            if (mode === 'line') {
-              c.strokeStyle = color
-              c.lineWidth = 1.5
-              c.beginPath()
-              for (let i = 0; i < bufLen; i++) {
-                const x = (i / bufLen) * W
-                const y = midY + ((data[i] / 128) - 1) * halfH
-                if (i === 0) c.moveTo(x, y)
-                else c.lineTo(x, y)
-              }
-              c.stroke()
-            } else if (mode === 'filled') {
-              // Gradient fill
-              const grad = c.createLinearGradient(0, midY - halfH, 0, midY + halfH)
-              grad.addColorStop(0, color.replace('1)', '0.03)'))
-              grad.addColorStop(0.5, color.replace('1)', '0.25)'))
-              grad.addColorStop(1, color.replace('1)', '0.03)'))
-              c.fillStyle = grad
-              c.beginPath()
-              for (let i = 0; i < bufLen; i++) {
-                const x = (i / bufLen) * W
-                const y = midY + ((data[i] / 128) - 1) * halfH
-                if (i === 0) c.moveTo(x, midY)
-                c.lineTo(x, y)
-              }
-              c.lineTo(W, midY)
-              c.closePath(); c.fill()
-              // Line on top
-              c.strokeStyle = color
-              c.lineWidth = 1.5
-              c.beginPath()
-              for (let i = 0; i < bufLen; i++) {
-                const x = (i / bufLen) * W
-                const y = midY + ((data[i] / 128) - 1) * halfH
-                if (i === 0) c.moveTo(x, y); else c.lineTo(x, y)
-              }
-              c.stroke()
-            } else if (mode === 'dots') {
-              for (let i = 0; i < bufLen; i += 3) {
-                const x = (i / bufLen) * W
-                const y = midY + ((data[i] / 128) - 1) * halfH
-                c.fillStyle = color
-                c.beginPath(); c.arc(x, y, 2, 0, Math.PI * 2); c.fill()
-              }
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Music Waves — uploop-vided</title>
+        <style>
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
             }
-          }
+            body {
+                background: #0a0a0f;
+                color: #e0e0e0;
+                font-family: system-ui, sans-serif;
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                padding: 60px 24px 40px;
+                gap: 14px;
+            }
+            .back {
+                position: fixed;
+                top: 16px;
+                left: 16px;
+                color: #888;
+                text-decoration: none;
+                font-size: 14px;
+                z-index: 100;
+            }
+            .back:hover {
+                color: #fff;
+            }
+            .title-bar {
+                width: min(960px, 90vw);
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            .title-bar h1 {
+                font-size: 1.25rem;
+                font-weight: 600;
+                color: #4f8;
+            }
+            .title-bar span {
+                font-size: 12px;
+                color: #666;
+            }
+            canvas {
+                width: min(960px, 90vw);
+                height: 380px;
+                background: #151520;
+                border-radius: 12px;
+                border: 1px solid #252535;
+                display: block;
+            }
+            .controls {
+                width: min(960px, 90vw);
+                background: #151520;
+                border-radius: 10px;
+                padding: 14px 20px;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                align-items: center;
+            }
+            .control-group {
+                display: flex;
+                flex-direction: column;
+                gap: 3px;
+            }
+            .control-group label {
+                font-size: 11px;
+                color: #888;
+            }
+            .control-group .val {
+                font-size: 11px;
+                color: #4f8;
+                font-family: "Courier New", monospace;
+            }
+            .control-group input[type="range"] {
+                accent-color: #4f8;
+                width: 100px;
+            }
+            button {
+                background: #1e1e30;
+                color: #e0e0e0;
+                border: 1px solid #333;
+                padding: 8px 16px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 13px;
+                transition: all 0.2s;
+                white-space: nowrap;
+            }
+            button:hover {
+                background: #2a2a40;
+            }
+            button.playing {
+                background: #2a3a2a;
+                border-color: #4f8;
+                color: #4f8;
+            }
+            button.mode-active {
+                background: #2a3a2a;
+                border-color: #4f8;
+                color: #4f8;
+            }
+            .mode-btns {
+                display: flex;
+                gap: 4px;
+            }
+            .mode-btns button {
+                padding: 6px 12px;
+                font-size: 11px;
+            }
+            .info-box {
+                width: min(960px, 90vw);
+                background: #0f0f1a;
+                border: 1px solid #252535;
+                border-radius: 8px;
+                padding: 10px 18px;
+                font-size: 12px;
+                color: #aaa;
+                display: flex;
+                gap: 24px;
+                flex-wrap: wrap;
+            }
+            .info-box span {
+                color: #f8c040;
+                font-family: "Courier New", monospace;
+            }
+            .info-box code {
+                color: #4f8;
+            }
+        </style>
+    </head>
+    <body>
+        <a href="../.." class="back">← Examples</a>
+        <div id="root"></div>
 
-          drawGrid(W, H)
+        <script type="module">
+            import { html, component } from "@uploop/html";
+            import { easing } from "@uploop/timeline";
+            import { blendModes } from "@uploop/compositor";
 
-          if (stereo) {
-            // Left channel
-            const lData = new Uint8Array(stereoLR.l.fftSize)
-            stereoLR.l.getByteTimeDomainData(lData)
-            const ampL = lData.reduce((s, v) => s + Math.abs(v - 128), 0) / lData.length / 128
-            drawWave(lData, H * 0.25, H * 0.2, 'rgba(80,200,120,1)')
+            // AUDIO_SOURCE = 'oscillator' — self-contained Web Audio, no CORS
 
-            // Right channel
-            const rData = new Uint8Array(stereoLR.r.fftSize)
-            stereoLR.r.getByteTimeDomainData(rData)
-            const ampR = rData.reduce((s, v) => s + Math.abs(v - 128), 0) / rData.length / 128
-            drawWave(rData, H * 0.75, H * 0.2, 'rgba(100,160,255,1)')
+            const MusicWaves = component("MusicWaves", {
+                state: {
+                    playing: true,
+                    volume: 0.7,
+                    mode: "line",
+                    showStereo: false,
+                    ampL: 0,
+                    ampR: 0,
+                    uploadLabel: "Self-oscillating",
+                },
+                update: {
+                    togglePlay: (s) => ({ ...s, playing: !s.playing }),
+                    setPlaying: (s, p) => ({ ...s, playing: p }),
+                    setVolume: (s, v) => ({ ...s, volume: v }),
+                    setMode: (s, m) => ({ ...s, mode: m }),
+                    toggleStereo: (s) => ({ ...s, showStereo: !s.showStereo }),
+                    setAmps: (s, l, r) => ({ ...s, ampL: l, ampR: r }),
+                    setLabel: (s, l) => ({ ...s, uploadLabel: l }),
+                },
+                view: (state, { send }) => html`
+                    <div class="title-bar">
+                        <h1>📊 Music Waves — Waveform Oscilloscope</h1>
+                        <span>Time-Domain · Stereo · Multi-Mode</span>
+                    </div>
+                    <canvas id="viz"></canvas>
+                    <div class="controls">
+                        <button
+                            id="playBtn"
+                            class="${state.playing ? "playing" : ""}"
+                            onclick=${() => send("togglePlay")}
+                        >
+                            ${state.playing ? "⏸ Pause" : "▶ Play"}
+                        </button>
+                        <div class="mode-btns">
+                            ${[
+                                { k: "line", n: "Line" },
+                                { k: "filled", n: "Filled" },
+                                { k: "dots", n: "Dots" },
+                            ].map(
+                                (m) => html`
+                                    <button
+                                        class="${state.mode === m.k
+                                            ? "mode-active"
+                                            : ""}"
+                                        onclick=${() => send("setMode", m.k)}
+                                    >
+                                        ${m.n}
+                                    </button>
+                                `,
+                            )}
+                        </div>
+                        <button
+                            class="${state.showStereo ? "mode-active" : ""}"
+                            onclick=${() => send("toggleStereo")}
+                        >
+                            ${state.showStereo ? "🔊 Stereo" : "🔉 Mono"}
+                        </button>
+                        <div class="control-group">
+                            <label
+                                >Volume
+                                <span class="val"
+                                    >${(state.volume * 100).toFixed(0)}%</span
+                                ></label
+                            >
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.05"
+                                value="${state.volume}"
+                                oninput=${(e) =>
+                                    send("setVolume", Number(e.target.value))}
+                            />
+                        </div>
+                        <label
+                            for="fileUpload"
+                            style="cursor:pointer; background:#1e1e30; color:#e0e0e0; border:1px solid #333; padding:8px 16px; border-radius:8px; font-size:13px;"
+                        >
+                            📁 ${state.uploadLabel}
+                        </label>
+                        <input
+                            type="file"
+                            id="fileUpload"
+                            accept="audio/*"
+                            style="display:none"
+                            onchange=${(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) {
+                                    send("setLabel", f.name);
+                                    send("loadFile", f);
+                                }
+                            }}
+                        />
+                    </div>
+                    <div class="info-box">
+                        <div>L Amp: <span id="ampL">0.00</span></div>
+                        <div>R Amp: <span id="ampR">0.00</span></div>
+                        <div>
+                            Using <code>@uploop/timeline</code> ·
+                            <code>@uploop/compositor</code>
+                        </div>
+                    </div>
+                `,
+                mount(el, ctx) {
+                    const canvas = el.querySelector("#viz");
+                    const c = canvas.getContext("2d");
+                    let audioCtx,
+                        analyser,
+                        gainNode,
+                        source,
+                        audioEl,
+                        dataArray,
+                        stereoLR;
+                    let oscNodes = null;
+                    let historyL = [],
+                        historyR = [];
 
-            el.querySelector('#ampL').textContent = ampL.toFixed(3)
-            el.querySelector('#ampR').textContent = ampR.toFixed(3)
-          } else {
-            const amp = dataArray.reduce((s, v) => s + Math.abs(v - 128), 0) / dataArray.length / 128
-            const hue = 200 + amp * 100 // blue → purple based on amplitude
-            drawWave(dataArray, H / 2, H * 0.4, `hsl(${hue},70%,55%)`)
-            el.querySelector('#ampL').textContent = amp.toFixed(3)
-            el.querySelector('#ampR').textContent = (amp * 0.98).toFixed(3)
-          }
-        }
+                    function resize() {
+                        const rect = canvas.getBoundingClientRect();
+                        canvas.width = rect.width * devicePixelRatio;
+                        canvas.height = rect.height * devicePixelRatio;
+                    }
 
-        function loop() {
-          render()
-          loop._raf = requestAnimationFrame(loop)
-        }
+                    function createStereoOscillators(
+                        audioCtx,
+                        analyserL,
+                        analyserR,
+                    ) {
+                        // Left channel: 55 Hz
+                        const oscL = audioCtx.createOscillator();
+                        const modL = audioCtx.createOscillator();
+                        const modGainL = audioCtx.createGain();
+                        oscL.type = "sawtooth";
+                        oscL.frequency.value = 55;
+                        modL.type = "sine";
+                        modL.frequency.value = 110;
+                        modGainL.gain.value = 200;
+                        modL.connect(modGainL);
+                        modGainL.connect(oscL.frequency);
+                        oscL.connect(analyserL);
 
-        const origSend = ctx.send
-        ctx.send = function(action, payload) {
-          if (action === 'loadFile' && payload) { loadAudio(URL.createObjectURL(payload)) }
-          if (action === 'setVolume') { if (audioEl) audioEl.volume = payload }
-          if (action === 'togglePlay') {
-            if (audioEl) { audioEl.paused ? audioEl.play() : audioEl.pause(); origSend('setPlaying', !audioEl.paused) }
-            else loadDefaultAudio()
-          }
-          origSend(action, payload)
-        }
+                        // Right channel: 55.5 Hz (slight offset for stereo width)
+                        const oscR = audioCtx.createOscillator();
+                        const modR = audioCtx.createOscillator();
+                        const modGainR = audioCtx.createGain();
+                        oscR.type = "sawtooth";
+                        oscR.frequency.value = 55.5;
+                        modR.type = "sine";
+                        modR.frequency.value = 111;
+                        modGainR.gain.value = 200;
+                        modR.connect(modGainR);
+                        modGainR.connect(oscR.frequency);
+                        oscR.connect(analyserR);
 
-        loadDefaultAudio()
-        window.addEventListener('resize', resize)
-        return () => { stopAudio(); window.removeEventListener('resize', resize) }
-      }
-    })
+                        oscL.start();
+                        modL.start();
+                        oscR.start();
+                        modR.start();
+                        return { oscL, modL, modGainL, oscR, modR, modGainR };
+                    }
 
-    MusicWaves.mount(document.getElementById('root'))
-  </script>
-</body>
+                    function initAudio() {
+                        stopAudio();
+                        audioCtx = new (
+                            window.AudioContext || window.webkitAudioContext
+                        )();
+
+                        // Stereo analysers
+                        const analyserL = audioCtx.createAnalyser();
+                        const analyserR = audioCtx.createAnalyser();
+                        analyserL.fftSize = 2048;
+                        analyserR.fftSize = 2048;
+
+                        // Mono analyser for summary / waveform display
+                        analyser = audioCtx.createAnalyser();
+                        analyser.fftSize = 2048;
+                        analyser.smoothingTimeConstant = 0.5;
+
+                        const merger = audioCtx.createChannelMerger(2);
+                        gainNode = audioCtx.createGain();
+                        gainNode.gain.value = ctx.get().volume;
+
+                        // Create stereo oscillators, each connected to its own analyser
+                        oscNodes = createStereoOscillators(
+                            audioCtx,
+                            analyserL,
+                            analyserR,
+                        );
+
+                        // analyserL → merger ch0, analyserR → merger ch1
+                        analyserL.connect(merger, 0, 0);
+                        analyserR.connect(merger, 0, 1);
+
+                        // Output through gainNode for volume control
+                        merger.connect(gainNode);
+                        gainNode.connect(audioCtx.destination);
+
+                        // Mono path: feed analyser from left oscillator (for waveform display)
+                        const monoGain = audioCtx.createGain();
+                        oscNodes.oscL.connect(monoGain);
+                        monoGain.connect(analyser);
+                        analyser.connect(gainNode);
+
+                        // Store all analysers for the render loop
+                        stereoLR = {
+                            l: analyserL,
+                            r: analyserR,
+                            mono: analyser,
+                        };
+                        dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                        resize();
+                        loop();
+                    }
+
+                    function loadAudio(url) {
+                        stopAudio();
+                        audioCtx = new (
+                            window.AudioContext || window.webkitAudioContext
+                        )();
+                        analyser = audioCtx.createAnalyser();
+                        analyser.fftSize = 2048;
+                        analyser.smoothingTimeConstant = 0.5;
+                        audioEl = new Audio(url);
+                        audioEl.crossOrigin = "anonymous";
+                        audioEl.loop = true;
+                        audioEl.volume = ctx.get().volume;
+                        source = audioCtx.createMediaElementSource(audioEl);
+
+                        // Splitter for stereo
+                        const splitter = audioCtx.createChannelSplitter(2);
+                        const merger = audioCtx.createChannelMerger(2);
+                        const analyserL = audioCtx.createAnalyser();
+                        const analyserR = audioCtx.createAnalyser();
+                        analyserL.fftSize = 2048;
+                        analyserR.fftSize = 2048;
+
+                        source.connect(splitter);
+                        splitter.connect(analyserL, 0);
+                        splitter.connect(analyserR, 1);
+                        analyserL.connect(merger, 0, 0);
+                        analyserR.connect(merger, 0, 1);
+                        merger.connect(audioCtx.destination);
+
+                        // Store both analysers
+                        stereoLR = {
+                            l: analyserL,
+                            r: analyserR,
+                            mono: analyser,
+                        };
+                        // Mono path for summary
+                        gainNode = audioCtx.createGain();
+                        source.connect(gainNode);
+                        gainNode.connect(analyser);
+                        analyser.connect(audioCtx.destination);
+
+                        dataArray = new Uint8Array(analyser.frequencyBinCount);
+                        audioEl.play();
+                        ctx.send("setPlaying", true);
+                        resize();
+                        loop();
+                    }
+
+                    function stopAudio() {
+                        if (loop._raf) cancelAnimationFrame(loop._raf);
+                        if (oscNodes) {
+                            try {
+                                oscNodes.oscL.stop();
+                                oscNodes.modL.stop();
+                                oscNodes.oscR.stop();
+                                oscNodes.modR.stop();
+                            } catch (_) {}
+                            oscNodes = null;
+                        }
+                        if (audioEl) {
+                            audioEl.pause();
+                            audioEl.src = "";
+                        }
+                        if (source) source.disconnect();
+                        if (audioCtx && audioCtx.state !== "closed")
+                            audioCtx.close();
+                        audioEl = null;
+                        source = null;
+                        analyser = null;
+                        gainNode = null;
+                        audioCtx = null;
+                        stereoLR = null;
+                    }
+
+                    function drawGrid(W, H) {
+                        c.strokeStyle = "#1a1a28";
+                        c.lineWidth = 0.5;
+                        const midY = ctx.get().showStereo ? H * 0.25 : H / 2;
+                        c.beginPath();
+                        c.moveTo(0, midY);
+                        c.lineTo(W, midY);
+                        c.stroke();
+                        if (ctx.get().showStereo) {
+                            c.beginPath();
+                            c.moveTo(0, H * 0.75);
+                            c.lineTo(W, H * 0.75);
+                            c.stroke();
+                        }
+                        // dB labels
+                        c.fillStyle = "#444";
+                        c.font = "9px monospace";
+                        c.fillText("0 dB", 4, 12);
+                        if (ctx.get().showStereo) {
+                            c.fillText("L", 4, H * 0.25 - 4);
+                            c.fillText("R", 4, H * 0.75 - 4);
+                        }
+                    }
+
+                    function render() {
+                        const W = canvas.width,
+                            H = canvas.height;
+                        c.clearRect(0, 0, W, H);
+                        if (!analyser || !stereoLR) return;
+
+                        const mode = ctx.get().mode;
+                        const stereo = ctx.get().showStereo;
+
+                        analyser.getByteTimeDomainData(dataArray);
+
+                        function drawWave(data, yOff, hScale, color) {
+                            const bufLen = data.length;
+                            const midY = yOff;
+                            const halfH = hScale;
+
+                            if (mode === "line") {
+                                c.strokeStyle = color;
+                                c.lineWidth = 1.5;
+                                c.beginPath();
+                                for (let i = 0; i < bufLen; i++) {
+                                    const x = (i / bufLen) * W;
+                                    const y =
+                                        midY + (data[i] / 128 - 1) * halfH;
+                                    if (i === 0) c.moveTo(x, y);
+                                    else c.lineTo(x, y);
+                                }
+                                c.stroke();
+                            } else if (mode === "filled") {
+                                // Gradient fill
+                                const grad = c.createLinearGradient(
+                                    0,
+                                    midY - halfH,
+                                    0,
+                                    midY + halfH,
+                                );
+                                grad.addColorStop(
+                                    0,
+                                    color.replace("1)", "0.03)"),
+                                );
+                                grad.addColorStop(
+                                    0.5,
+                                    color.replace("1)", "0.25)"),
+                                );
+                                grad.addColorStop(
+                                    1,
+                                    color.replace("1)", "0.03)"),
+                                );
+                                c.fillStyle = grad;
+                                c.beginPath();
+                                for (let i = 0; i < bufLen; i++) {
+                                    const x = (i / bufLen) * W;
+                                    const y =
+                                        midY + (data[i] / 128 - 1) * halfH;
+                                    if (i === 0) c.moveTo(x, midY);
+                                    c.lineTo(x, y);
+                                }
+                                c.lineTo(W, midY);
+                                c.closePath();
+                                c.fill();
+                                // Line on top
+                                c.strokeStyle = color;
+                                c.lineWidth = 1.5;
+                                c.beginPath();
+                                for (let i = 0; i < bufLen; i++) {
+                                    const x = (i / bufLen) * W;
+                                    const y =
+                                        midY + (data[i] / 128 - 1) * halfH;
+                                    if (i === 0) c.moveTo(x, y);
+                                    else c.lineTo(x, y);
+                                }
+                                c.stroke();
+                            } else if (mode === "dots") {
+                                for (let i = 0; i < bufLen; i += 3) {
+                                    const x = (i / bufLen) * W;
+                                    const y =
+                                        midY + (data[i] / 128 - 1) * halfH;
+                                    c.fillStyle = color;
+                                    c.beginPath();
+                                    c.arc(x, y, 2, 0, Math.PI * 2);
+                                    c.fill();
+                                }
+                            }
+                        }
+
+                        drawGrid(W, H);
+
+                        if (stereo) {
+                            // Left channel
+                            const lData = new Uint8Array(stereoLR.l.fftSize);
+                            stereoLR.l.getByteTimeDomainData(lData);
+                            const ampL =
+                                lData.reduce(
+                                    (s, v) => s + Math.abs(v - 128),
+                                    0,
+                                ) /
+                                lData.length /
+                                128;
+                            drawWave(
+                                lData,
+                                H * 0.25,
+                                H * 0.2,
+                                "rgba(80,200,120,1)",
+                            );
+
+                            // Right channel
+                            const rData = new Uint8Array(stereoLR.r.fftSize);
+                            stereoLR.r.getByteTimeDomainData(rData);
+                            const ampR =
+                                rData.reduce(
+                                    (s, v) => s + Math.abs(v - 128),
+                                    0,
+                                ) /
+                                rData.length /
+                                128;
+                            drawWave(
+                                rData,
+                                H * 0.75,
+                                H * 0.2,
+                                "rgba(100,160,255,1)",
+                            );
+
+                            el.querySelector("#ampL").textContent =
+                                ampL.toFixed(3);
+                            el.querySelector("#ampR").textContent =
+                                ampR.toFixed(3);
+                        } else {
+                            const amp =
+                                dataArray.reduce(
+                                    (s, v) => s + Math.abs(v - 128),
+                                    0,
+                                ) /
+                                dataArray.length /
+                                128;
+                            const hue = 200 + amp * 100; // blue → purple based on amplitude
+                            drawWave(
+                                dataArray,
+                                H / 2,
+                                H * 0.4,
+                                `hsl(${hue},70%,55%)`,
+                            );
+                            el.querySelector("#ampL").textContent =
+                                amp.toFixed(3);
+                            el.querySelector("#ampR").textContent = (
+                                amp * 0.98
+                            ).toFixed(3);
+                        }
+                    }
+
+                    function loop() {
+                        render();
+                        loop._raf = requestAnimationFrame(loop);
+                    }
+
+                    const origSend = ctx.send;
+                    ctx.send = function (action, payload) {
+                        if (action === "loadFile" && payload) {
+                            loadAudio(URL.createObjectURL(payload));
+                        }
+                        if (action === "setVolume") {
+                            if (gainNode) gainNode.gain.value = payload;
+                            if (audioEl) audioEl.volume = payload;
+                        }
+                        if (action === "togglePlay") {
+                            if (audioCtx) {
+                                if (audioCtx.state === "running") {
+                                    audioCtx.suspend();
+                                    origSend("setPlaying", false);
+                                } else {
+                                    audioCtx.resume();
+                                    origSend("setPlaying", true);
+                                }
+                            } else {
+                                initAudio();
+                            }
+                        }
+                        origSend(action, payload);
+                    };
+
+                    initAudio();
+                    window.addEventListener("resize", resize);
+                    return () => {
+                        stopAudio();
+                        window.removeEventListener("resize", resize);
+                    };
+                },
+            });
+
+            MusicWaves.mount(document.getElementById("root"));
+        </script>
+    </body>
 </html>
